@@ -1,0 +1,213 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StatusAtivo {
+  ativo
+  inativo
+}
+
+enum StatusAtivaUsina {
+  ativa
+  inativa
+}
+
+enum StatusContrato {
+  ativo
+  encerrado
+}
+
+enum StatusRegistro {
+  rascunho
+  enviado
+}
+
+enum LadoPista {
+  direito
+  esquerdo
+}
+
+enum TipoFoto {
+  antes
+  durante
+  depois
+  trena
+}
+
+enum PerfilUsuario {
+  operador
+  gestor
+  engenheiro
+  terceirizado
+}
+
+enum TipoPlaca {
+  propria
+  terceirizada
+}
+
+enum TipoServico {
+  interno
+  terceirizado
+}
+
+model Motorista {
+  id        Int         @id @default(autoincrement())
+  nome      String
+  cpf       String      @unique
+  cnh       String
+  status    StatusAtivo @default(ativo)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  registros Registro[]
+
+  @@map("motoristas")
+}
+
+model Placa {
+  id         Int         @id @default(autoincrement())
+  placa      String      @unique
+  veiculo    String
+  capacidade String
+  tipo       TipoPlaca   @default(propria)
+  status     StatusAtivo @default(ativo)
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  registros  Registro[]
+
+  @@map("placas")
+}
+
+model Contrato {
+  id             Int             @id @default(autoincrement())
+  codigo         String          @unique
+  orgao          String
+  descricao      String
+  vigenciaInicio DateTime        @map("vigencia_inicio")
+  vigenciaFim    DateTime        @map("vigencia_fim")
+  status         StatusContrato  @default(ativo)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  registros      Registro[]
+
+  @@map("contratos")
+}
+
+model Servico {
+  id        Int         @id @default(autoincrement())
+  nome      String
+  codigo    String      @unique
+  tipo      TipoServico @default(interno)
+  status    StatusAtivo @default(ativo)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  registros Registro[]
+
+  @@map("servicos")
+}
+
+model Usina {
+  id         Int              @id @default(autoincrement())
+  numero     String
+  nome       String
+  capacidade String
+  status     StatusAtivaUsina @default(ativa)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  registros  Registro[]
+
+  @@map("usinas")
+}
+
+model Rodovia {
+  id        Int        @id @default(autoincrement())
+  rodovia   String
+  trecho    String
+  kmInicio  Decimal    @map("km_inicio")
+  kmFim     Decimal    @map("km_fim")
+  cidade    String
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+  registros Registro[]
+
+  @@map("rodovias")
+}
+
+model Clima {
+  id        Int         @id @default(autoincrement())
+  condicao  String
+  icone     String
+  status    StatusAtivo @default(ativo)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+  registros Registro[]
+
+  @@map("climas")
+}
+
+model Registro {
+  id            Int             @id @default(autoincrement())
+  data          DateTime        @default(now())
+  motoristaId   Int             @map("motorista_id")
+  motorista     Motorista       @relation(fields: [motoristaId], references: [id])
+  placaId       Int             @map("placa_id")
+  placa         Placa           @relation(fields: [placaId], references: [id])
+  contratoId    Int             @map("contrato_id")
+  contrato      Contrato        @relation(fields: [contratoId], references: [id])
+  servicoId     Int             @map("servico_id")
+  servico       Servico         @relation(fields: [servicoId], references: [id])
+  climaId       Int             @map("clima_id")
+  clima         Clima           @relation(fields: [climaId], references: [id])
+  usinaId       Int             @map("usina_id")
+  usina         Usina           @relation(fields: [usinaId], references: [id])
+  numeroTicket  String          @map("numero_ticket")
+  toneladas     Decimal
+  fotoTicket    String?         @map("foto_ticket")
+  rodoviaId     Int             @map("rodovia_id")
+  rodovia       Rodovia         @relation(fields: [rodoviaId], references: [id])
+  km            Decimal
+  cidade        String
+  comprimento   Decimal
+  largura       Decimal
+  espessura     Decimal
+  lado          LadoPista
+  observacoes   String?
+  status        StatusRegistro  @default(rascunho)
+  usuarioId     Int?            @map("usuario_id")
+  usuario       Usuario?        @relation(fields: [usuarioId], references: [id])
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  fotos         RegistroFoto[]
+
+  @@map("registros")
+}
+
+model RegistroFoto {
+  id         Int       @id @default(autoincrement())
+  registroId Int       @map("registro_id")
+  registro   Registro  @relation(fields: [registroId], references: [id], onDelete: Cascade)
+  tipo       TipoFoto
+  arquivo    String
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("registro_fotos")
+}
+
+model Usuario {
+  id        Int           @id @default(autoincrement())
+  nome      String
+  email     String        @unique
+  senha     String
+  perfil    PerfilUsuario
+  status    StatusAtivo   @default(ativo)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  registros Registro[]
+
+  @@map("usuarios")
+}

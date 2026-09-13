@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Fundo full-bleed: o conteúdo fica dentro da "safe zone" de 80% exigida
+       por ícones maskable do Android (nada importante fora do círculo central). -->
+  <rect width="512" height="512" fill="#0f1115"/>
+
+  <!-- Pista de asfalto em perspectiva -->
+  <path d="M196 132 h120 l68 248 h-256 z" fill="#2b303b"/>
+
+  <!-- Faixas centrais tracejadas -->
+  <g fill="#f2b705">
+    <path d="M247 150 h18 l3 44 h-24 z"/>
+    <path d="M242 216 h28 l4 52 h-36 z"/>
+    <path d="M236 290 h40 l5 62 h-50 z"/>
+  </g>
+
+  <!-- Bordas laterais da pista -->
+  <g fill="#f2b705" opacity="0.85">
+    <path d="M196 132 h10 l-52 248 h-12 z"/>
+    <path d="M306 132 h10 l54 248 h-12 z"/>
+  </g>
+</svg>

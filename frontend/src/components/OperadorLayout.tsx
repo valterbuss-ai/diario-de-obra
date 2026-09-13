@@ -1,7 +1,8 @@
-import { ClipboardList, LogOut } from "lucide-react";
+import { ClipboardList, Download, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { usePwaInstall } from "../hooks/usePwaInstall";
 import { useApiList } from "../services/hooks";
 import type { Registro } from "../types";
 
@@ -22,6 +23,7 @@ export function OperadorLayout({ step, title, subtitle, children }: OperadorLayo
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
   const { data: pendentes } = useApiList<Registro>("/registros?status=rascunho");
+  const { canInstall, promptInstall } = usePwaInstall();
 
   return (
     <div className="min-h-screen bg-bg pb-10">
@@ -32,6 +34,16 @@ export function OperadorLayout({ step, title, subtitle, children }: OperadorLayo
             <h1 className="text-lg font-semibold text-white">{title}</h1>
           </div>
           <div className="flex items-center gap-2">
+            {canInstall && (
+              <button
+                onClick={promptInstall}
+                className="flex items-center gap-1.5 rounded-lg border border-primary px-2.5 py-2 text-xs font-semibold text-primary hover:bg-primary hover:text-black"
+                aria-label="Instalar app"
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden sm:inline">Instalar app</span>
+              </button>
+            )}
             <button
               onClick={() => navigate("/operador/dia")}
               className="relative rounded-lg border border-border p-2 text-gray-400 hover:text-primary hover:border-primary"

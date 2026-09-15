@@ -88,20 +88,28 @@ export function createCrudController({
     remove: async (req: Request, res: Response) => {
       const id = Number(req.params.id);
       try {
-        await delegate.delete({ where: { id } });
-        res.status(204).send();
-      } catch (err: any) {
-        if (err.code === "P2025") {
+        const item = await delegate.findUnique({ where: { id } });
+        if (!item || item.excluidoEm) {
           return res.status(404).json({ message: "Registro não encontrado." });
         }
-        // P2003: o cadastro já foi usado em registros de obra. Apagar de verdade
-        // quebraria o histórico (e o que já foi pra planilha do cliente), então
-        // ele é só marcado como excluído e some das listas.
-        if (err.code === "P2003") {
+
+        // Todos os cadastros mestres são referenciados por registros de obra
+        // (ex: modelName "usina" -> registro.usinaId). Se já foi usado, apagar de
+        // verdade quebraria o histórico e o que já foi pra planilha do cliente,
+        // então só marca como excluído e some das listas. Conferido antes de
+        // tentar apagar, em vez de depender do código de erro do banco.
+        const usos = await prisma.registro.count({ where: { [`${modelName}Id`]: id } });
+        if (usos > 0) {
           await delegate.update({ where: { id }, data: { excluidoEm: new Date() } });
-          return res.status(204).send();
+        } else {
+          await delegate.delete({ where: { id } });
         }
-        throw err;
+        res.status(204).send();
+      } catch (err: any) {
+        // Express 4 não captura erro de handler async: sem este retorno a
+        // requisição ficava pendurada e o admin só via uma mensagem genérica.
+        console.error(`[crud:${modelName}] Erro ao excluir id ${id}:`, err);
+        res.status(500).json({ message: `Não foi possível excluir: ${err.code ?? ""} ${err.message ?? ""}`.trim() });
       }
     },
   };

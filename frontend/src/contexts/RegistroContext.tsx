@@ -1,6 +1,7 @@
-﻿import { createContext, useContext, useState } from "react";
+﻿import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { api } from "../services/api";
+import { useAuth } from "./AuthContext";
 import type { LadoPista, Registro } from "../types";
 
 export interface RegistroDraft {
@@ -52,11 +53,27 @@ export const emptyDraft: RegistroDraft = {
   fotos: { antes: null, durante: null, depois: null, trena: null },
 };
 
+export function equipePreenchida(draft: RegistroDraft) {
+  return (
+    draft.motoristaNome.trim().length >= 3 &&
+    draft.placaId !== "" &&
+    draft.contratoId !== "" &&
+    draft.servicoId !== "" &&
+    draft.climaId !== ""
+  );
+}
+
+export function cargaPreenchida(draft: RegistroDraft) {
+  return draft.usinaId !== "" && draft.numeroTicket.trim().length > 0 && Number(draft.toneladas) > 0;
+}
+
 interface RegistroContextValue {
   draft: RegistroDraft;
   updateDraft: (patch: Partial<RegistroDraft>) => void;
   updateFoto: (tipo: keyof RegistroDraft["fotos"], file: File | null) => void;
   resetDraft: () => void;
+  /** Limpa só a etapa 3 (local, dimensões e fotos), mantendo equipe e carga. */
+  resetLocal: () => void;
   submitting: boolean;
   submitError: string | null;
   submitDraft: (status?: "rascunho" | "enviado") => Promise<Registro>;
@@ -68,6 +85,13 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<RegistroDraft>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const { usuario } = useAuth();
+
+  // Como equipe e carga passam a ser mantidas entre registros, um novo login no
+  // mesmo celular não pode herdar o rascunho do operador anterior.
+  useEffect(() => {
+    setDraft(emptyDraft);
+  }, [usuario?.id]);
 
   function updateDraft(patch: Partial<RegistroDraft>) {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -79,6 +103,22 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
 
   function resetDraft() {
     setDraft(emptyDraft);
+  }
+
+  function resetLocal() {
+    setDraft((prev) => ({
+      ...prev,
+      rodoviaNome: emptyDraft.rodoviaNome,
+      km: emptyDraft.km,
+      cidade: emptyDraft.cidade,
+      rodoviaId: emptyDraft.rodoviaId,
+      comprimento: emptyDraft.comprimento,
+      largura: emptyDraft.largura,
+      espessura: emptyDraft.espessura,
+      lado: emptyDraft.lado,
+      observacoes: emptyDraft.observacoes,
+      fotos: emptyDraft.fotos,
+    }));
   }
 
   async function submitDraft(status: "rascunho" | "enviado" = "rascunho") {
@@ -123,7 +163,7 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <RegistroContext.Provider value={{ draft, updateDraft, updateFoto, resetDraft, submitting, submitError, submitDraft }}>
+    <RegistroContext.Provider value={{ draft, updateDraft, updateFoto, resetDraft, resetLocal, submitting, submitError, submitDraft }}>
       {children}
     </RegistroContext.Provider>
   );

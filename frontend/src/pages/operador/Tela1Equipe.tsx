@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { SelectField, TextField } from "../../components/FormField";
 import { useAuth } from "../../contexts/AuthContext";
-import { useRegistroDraft } from "../../contexts/RegistroContext";
+import { equipePreenchida, useRegistroDraft } from "../../contexts/RegistroContext";
 import { useApiList } from "../../services/hooks";
 import type { Clima, Contrato, Motorista, Placa, Servico } from "../../types";
 
@@ -29,8 +29,7 @@ export function Tela1Equipe() {
   const climasAtivos = climas.filter((c) => c.status === "ativo");
   const motoristasAtivos = motoristas.filter((m) => m.status === "ativo");
 
-  const podeContinuar =
-    draft.motoristaNome.trim().length >= 3 && draft.placaId !== "" && draft.contratoId !== "" && draft.servicoId !== "" && draft.climaId !== "";
+  const podeContinuar = equipePreenchida(draft);
 
   return (
     <OperadorLayout step={1} title="Nova ocorrência" subtitle="Identifique a equipe e as condições do serviço.">

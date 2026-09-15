@@ -18,7 +18,7 @@ export function Login() {
     e.preventDefault();
     try {
       const logged = await login(email, senha);
-      if (logged.perfil === "operador") navigate("/operador/equipe");
+      if (logged.perfil === "operador" || logged.perfil === "terceirizado") navigate("/operador/equipe");
       else if (logged.perfil === "gestor") navigate("/admin");
       else navigate("/engenheiro");
     } catch {

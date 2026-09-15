@@ -2,7 +2,7 @@ import { CheckCircle2, ClipboardList, Plus, Send } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
-import { useRegistroDraft } from "../../contexts/RegistroContext";
+import { cargaPreenchida, equipePreenchida, useRegistroDraft } from "../../contexts/RegistroContext";
 import { api } from "../../services/api";
 import { useApiList } from "../../services/hooks";
 import type { Registro } from "../../types";
@@ -13,13 +13,19 @@ function dataHoraPtBr(value: string) {
 
 export function RegistrosDoDia() {
   const navigate = useNavigate();
-  const { resetDraft } = useRegistroDraft();
+  const { draft, resetDraft, resetLocal } = useRegistroDraft();
   const { data: pendentes, loading, error, reload } = useApiList<Registro>("/registros?status=rascunho");
   const [enviando, setEnviando] = useState(false);
   const [enviarErro, setEnviarErro] = useState<string | null>(null);
   const [enviados, setEnviados] = useState<number | null>(null);
 
   function novoRegistro() {
+    // Mesma equipe e carga do registro anterior: vai direto pra etapa 3.
+    resetLocal();
+    navigate(equipePreenchida(draft) && cargaPreenchida(draft) ? "/operador/local" : "/operador/equipe");
+  }
+
+  function comecarDoZero() {
     resetDraft();
     navigate("/operador/equipe");
   }
@@ -98,6 +104,16 @@ export function RegistrosDoDia() {
             {enviando ? "Enviando..." : `Enviar tudo (${pendentes.length})`}
           </button>
         </div>
+
+        {equipePreenchida(draft) && (
+          <button
+            type="button"
+            onClick={comecarDoZero}
+            className="self-center text-sm text-gray-500 underline-offset-4 hover:text-primary hover:underline"
+          >
+            Começar do zero (trocar equipe ou carga)
+          </button>
+        )}
       </div>
     </OperadorLayout>
   );

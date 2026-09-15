@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { PhotoSlot } from "../../components/PhotoSlot";
 import { SelectField, TextField } from "../../components/FormField";
-import { useRegistroDraft } from "../../contexts/RegistroContext";
+import { cargaPreenchida, useRegistroDraft } from "../../contexts/RegistroContext";
 import { useApiList } from "../../services/hooks";
 import type { Usina } from "../../types";
 
@@ -13,7 +13,7 @@ export function Tela2Carga() {
   const { data: usinas } = useApiList<Usina>("/usinas");
   const usinasAtivas = usinas.filter((u) => u.status === "ativa");
 
-  const podeContinuar = draft.usinaId !== "" && draft.numeroTicket.trim().length > 0 && Number(draft.toneladas) > 0;
+  const podeContinuar = cargaPreenchida(draft);
 
   return (
     <OperadorLayout step={2} title="Dados da carga" subtitle="Informe a usina de origem e o ticket de pesagem.">

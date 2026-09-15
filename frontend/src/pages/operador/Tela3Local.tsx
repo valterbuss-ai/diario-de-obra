@@ -4,9 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { PhotoSlot } from "../../components/PhotoSlot";
 import { SelectField, TextAreaField, TextField } from "../../components/FormField";
+import { useAuth } from "../../contexts/AuthContext";
 import { useRegistroDraft } from "../../contexts/RegistroContext";
 import { api } from "../../services/api";
 import { useApiList } from "../../services/hooks";
+import type { Placa, Servico, Usina } from "../../types";
 
 const FOTOS: { tipo: "antes" | "durante" | "depois" | "trena"; label: string }[] = [
   { tipo: "antes", label: "Antes" },
@@ -16,9 +18,20 @@ const FOTOS: { tipo: "antes" | "durante" | "depois" | "trena"; label: string }[]
 ];
 
 export function Tela3Local() {
-  const { draft, updateDraft, updateFoto, submitDraft, resetDraft, submitting, submitError } = useRegistroDraft();
+  const { draft, updateDraft, updateFoto, submitDraft, resetLocal, submitting, submitError } = useRegistroDraft();
   const navigate = useNavigate();
+  const { usuario } = useAuth();
   const { data: rodoviasOpcoes } = useApiList<string>("/rodovias/opcoes");
+  const { data: placas } = useApiList<Placa>("/placas");
+  const { data: servicos } = useApiList<Servico>(usuario?.perfil === "terceirizado" ? "/servicos-terceiros" : "/servicos");
+  const { data: usinas } = useApiList<Usina>("/usinas");
+
+  const placa = placas.find((p) => p.id === draft.placaId)?.placa;
+  const servico = servicos.find((s) => s.id === draft.servicoId)?.nome;
+  const usina = usinas.find((u) => u.id === draft.usinaId)?.nome;
+  const resumoEquipeCarga = [draft.motoristaNome, placa, servico, usina, draft.numeroTicket && `Ticket ${draft.numeroTicket}`]
+    .filter(Boolean)
+    .join(" · ");
 
   const [cidadeStatus, setCidadeStatus] = useState<"idle" | "buscando" | "encontrada" | "nao-encontrada">("idle");
 
@@ -69,7 +82,8 @@ export function Tela3Local() {
   async function handleSalvar() {
     try {
       await submitDraft("rascunho");
-      resetDraft();
+      // Equipe e carga ficam para o próximo registro; só a etapa 3 é limpa.
+      resetLocal();
       navigate("/operador/dia");
     } catch {
       // erro exposto via contexto (submitError)
@@ -79,6 +93,20 @@ export function Tela3Local() {
   return (
     <OperadorLayout step={3} title="Localização e fotos" subtitle="Registre onde o serviço foi realizado e documente com fotos.">
       <div className="flex flex-col gap-8">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-alt px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-wide text-gray-500">Equipe e carga</p>
+            <p className="truncate text-sm text-gray-300">{resumoEquipeCarga}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/operador/equipe")}
+            className="shrink-0 text-sm font-semibold text-primary hover:underline"
+          >
+            Alterar
+          </button>
+        </div>
+
         <section className="flex flex-col gap-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Localização</h2>
 

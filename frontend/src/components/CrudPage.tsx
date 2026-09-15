@@ -96,8 +96,8 @@ export function CrudPage<T extends { id: number }>({
     try {
       await api.delete(`${endpoint}/${item.id}`);
       reload();
-    } catch {
-      window.alert("Não foi possível excluir este registro.");
+    } catch (err: any) {
+      window.alert(err.response?.data?.message ?? "Não foi possível excluir este registro.");
     }
   }
 

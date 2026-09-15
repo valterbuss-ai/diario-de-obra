@@ -86,14 +86,9 @@ export const registroController = {
     const trena = files.trena?.[0];
     const fotoTicket = files.fotoTicket?.[0];
 
-    if (status === "enviado" && (!antes || !durante || !depois || !trena)) {
-      return res.status(400).json({
-        message: "As 4 fotos do serviço (antes, durante, depois e trena) são obrigatórias para finalizar o registro.",
-      });
-    }
-
+    // Fotos do serviço são opcionais: nem todo serviço precisa das 4.
     const [motorista, placa, contrato, servico, clima, usina, rodovia] = await Promise.all([
-      prisma.motorista.findFirst({ where: { nome: { equals: data.motoristaNome, mode: "insensitive" } } }),
+      prisma.motorista.findFirst({ where: { nome: { equals: data.motoristaNome, mode: "insensitive" }, excluidoEm: null } }),
       prisma.placa.findUnique({ where: { id: data.placaId } }),
       prisma.contrato.findUnique({ where: { id: data.contratoId } }),
       prisma.servico.findUnique({ where: { id: data.servicoId } }),

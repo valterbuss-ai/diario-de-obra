@@ -38,7 +38,7 @@ export function createCrudController({
 
   return {
     list: async (_req: Request, res: Response) => {
-      const items = await delegate.findMany({ where: listWhere, orderBy: orderBy ?? { id: "asc" } });
+      const items = await delegate.findMany({ where: { ...listWhere, excluidoEm: null }, orderBy: orderBy ?? { id: "asc" } });
       res.json(items);
     },
 
@@ -93,6 +93,13 @@ export function createCrudController({
       } catch (err: any) {
         if (err.code === "P2025") {
           return res.status(404).json({ message: "Registro não encontrado." });
+        }
+        // P2003: o cadastro já foi usado em registros de obra. Apagar de verdade
+        // quebraria o histórico (e o que já foi pra planilha do cliente), então
+        // ele é só marcado como excluído e some das listas.
+        if (err.code === "P2003") {
+          await delegate.update({ where: { id }, data: { excluidoEm: new Date() } });
+          return res.status(204).send();
         }
         throw err;
       }

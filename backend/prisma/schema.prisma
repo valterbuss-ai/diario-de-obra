@@ -65,6 +65,7 @@ model Motorista {
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
   registros Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("motoristas")
 }
@@ -79,6 +80,7 @@ model Placa {
   createdAt  DateTime    @default(now()) @map("created_at")
   updatedAt  DateTime    @updatedAt @map("updated_at")
   registros  Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("placas")
 }
@@ -94,6 +96,7 @@ model Contrato {
   createdAt      DateTime        @default(now()) @map("created_at")
   updatedAt      DateTime        @updatedAt @map("updated_at")
   registros      Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("contratos")
 }
@@ -107,6 +110,7 @@ model Servico {
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
   registros Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("servicos")
 }
@@ -120,6 +124,7 @@ model Usina {
   createdAt  DateTime         @default(now()) @map("created_at")
   updatedAt  DateTime         @updatedAt @map("updated_at")
   registros  Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("usinas")
 }
@@ -134,6 +139,7 @@ model Rodovia {
   createdAt DateTime   @default(now()) @map("created_at")
   updatedAt DateTime   @updatedAt @map("updated_at")
   registros Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("rodovias")
 }
@@ -146,6 +152,7 @@ model Clima {
   createdAt DateTime    @default(now()) @map("created_at")
   updatedAt DateTime    @updatedAt @map("updated_at")
   registros Registro[]
+  excluidoEm DateTime? @map("excluido_em")
 
   @@map("climas")
 }

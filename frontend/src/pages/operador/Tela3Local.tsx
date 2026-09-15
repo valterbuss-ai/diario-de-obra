@@ -76,7 +76,6 @@ export function Tela3Local() {
     Number(draft.largura) > 0 &&
     Number(draft.espessura) > 0 &&
     draft.lado !== "" &&
-    fotosCount === 4 &&
     !submitting;
 
   async function handleSalvar() {
@@ -202,7 +201,7 @@ export function Tela3Local() {
         <section className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Registro fotográfico</h2>
-            <span className={`text-sm font-semibold ${fotosCount === 4 ? "text-success" : "text-gray-400"}`}>{fotosCount} de 4 fotos registradas</span>
+            <span className={`text-sm font-semibold ${fotosCount === 4 ? "text-success" : "text-gray-400"}`}>{fotosCount} de 4 fotos (opcional)</span>
           </div>
 
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

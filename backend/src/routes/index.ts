@@ -49,13 +49,13 @@ router.post(
 
 router.get("/dashboard/resumo", authMiddleware, async (_req, res) => {
   const [motoristas, placas, contratos, servicos, usinas, rodovias, climas, registros] = await Promise.all([
-    prisma.motorista.count(),
-    prisma.placa.count(),
-    prisma.contrato.count(),
-    prisma.servico.count(),
-    prisma.usina.count(),
-    prisma.rodovia.count(),
-    prisma.clima.count(),
+    prisma.motorista.count({ where: { excluidoEm: null } }),
+    prisma.placa.count({ where: { excluidoEm: null } }),
+    prisma.contrato.count({ where: { excluidoEm: null } }),
+    prisma.servico.count({ where: { excluidoEm: null } }),
+    prisma.usina.count({ where: { excluidoEm: null } }),
+    prisma.rodovia.count({ where: { excluidoEm: null } }),
+    prisma.clima.count({ where: { excluidoEm: null } }),
     prisma.registro.count(),
   ]);
   res.json({ motoristas, placas, contratos, servicos, usinas, rodovias, climas, registros });

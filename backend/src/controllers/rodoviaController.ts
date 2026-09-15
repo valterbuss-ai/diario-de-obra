@@ -29,6 +29,7 @@ export const rodoviaController = {
   // Nomes distintos de rodovias cadastradas, para popular o dropdown do operador.
   opcoes: async (_req: Request, res: Response) => {
     const rodovias = await prisma.rodovia.findMany({
+      where: { excluidoEm: null },
       distinct: ["rodovia"],
       select: { rodovia: true },
       orderBy: { rodovia: "asc" },
@@ -45,7 +46,7 @@ export const rodoviaController = {
     const { rodovia, km } = parsed.data;
 
     const trecho = await prisma.rodovia.findFirst({
-      where: { rodovia, kmInicio: { lte: km }, kmFim: { gte: km } },
+      where: { rodovia, kmInicio: { lte: km }, kmFim: { gte: km }, excluidoEm: null },
     });
 
     if (!trecho) {

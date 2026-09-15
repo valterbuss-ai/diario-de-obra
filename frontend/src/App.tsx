@@ -3,6 +3,7 @@ import { AdminLayout } from "./components/AdminLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { RegistroProvider } from "./contexts/RegistroContext";
+import { SincronizacaoProvider } from "./contexts/SincronizacaoContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { Login } from "./pages/Login";
 import { Climas } from "./pages/admin/Climas";
@@ -32,6 +33,7 @@ export default function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
+      <SincronizacaoProvider>
       <RegistroProvider>
         <Router>
           <Routes>
@@ -175,6 +177,7 @@ export default function App() {
           </Routes>
         </Router>
       </RegistroProvider>
+      </SincronizacaoProvider>
     </AuthProvider>
     </ThemeProvider>
   );

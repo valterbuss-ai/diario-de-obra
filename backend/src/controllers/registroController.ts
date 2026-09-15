@@ -21,6 +21,10 @@ const createSchema = z.object({
   lado: z.enum(["direito", "esquerdo"]),
   observacoes: z.string().optional().nullable(),
   status: z.enum(["rascunho", "enviado"]).optional(),
+  // Enviados pelo app: id gerado no celular (evita duplicar quando o envio é
+  // repetido depois de ficar sem internet) e a hora em que o operador salvou.
+  clienteId: z.string().uuid().optional(),
+  data: z.coerce.date().optional(),
 });
 
 type UploadedFiles = Record<string, Express.Multer.File[]>;
@@ -78,6 +82,13 @@ export const registroController = {
     }
     const data = parsed.data;
     const status = data.status ?? "enviado";
+
+    // Reenvio de um registro que já chegou (ex: a resposta se perdeu por falta de
+    // sinal e o celular tentou de novo): devolve o existente em vez de duplicar.
+    if (data.clienteId) {
+      const existente = await prisma.registro.findUnique({ where: { clienteId: data.clienteId }, include: { fotos: true } });
+      if (existente) return res.status(200).json(existente);
+    }
 
     const files = (req.files ?? {}) as UploadedFiles;
     const antes = files.antes?.[0];
@@ -146,6 +157,8 @@ export const registroController = {
         observacoes: data.observacoes ?? null,
         status,
         usuarioId: req.user?.id ?? null,
+        clienteId: data.clienteId ?? null,
+        data: data.data,
         fotos: {
           create: [
             antes && { tipo: "antes" as const, arquivo: fileUrl(antes)! },

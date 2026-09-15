@@ -1,8 +1,9 @@
 ﻿import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { api } from "../services/api";
+import { enviarRegistro, montarRegistroParaEnvio } from "../offline/registroOffline";
 import { useAuth } from "./AuthContext";
-import type { LadoPista, Registro } from "../types";
+import { useSincronizacao } from "./SincronizacaoContext";
+import type { LadoPista } from "../types";
 
 export interface RegistroDraft {
   motoristaNome: string;
@@ -76,7 +77,8 @@ interface RegistroContextValue {
   resetLocal: () => void;
   submitting: boolean;
   submitError: string | null;
-  submitDraft: (status?: "rascunho" | "enviado") => Promise<Registro>;
+  /** Salva no servidor; sem internet, guarda no celular (offline: true). */
+  submitDraft: (status?: "rascunho" | "enviado") => Promise<{ offline: boolean }>;
 }
 
 const RegistroContext = createContext<RegistroContextValue | undefined>(undefined);
@@ -86,6 +88,7 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { usuario } = useAuth();
+  const { adicionarNaFila } = useSincronizacao();
 
   // Como equipe e carga passam a ser mantidas entre registros, um novo login no
   // mesmo celular não pode herdar o rascunho do operador anterior.
@@ -124,39 +127,32 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   async function submitDraft(status: "rascunho" | "enviado" = "rascunho") {
     setSubmitting(true);
     setSubmitError(null);
+    const item = montarRegistroParaEnvio(draft, status, usuario?.id ?? 0);
     try {
-      const form = new FormData();
-      form.append("motoristaNome", draft.motoristaNome);
-      form.append("placaId", String(draft.placaId));
-      form.append("contratoId", String(draft.contratoId));
-      form.append("servicoId", String(draft.servicoId));
-      form.append("climaId", String(draft.climaId));
-      form.append("usinaId", String(draft.usinaId));
-      form.append("numeroTicket", draft.numeroTicket);
-      form.append("toneladas", draft.toneladas);
-      form.append("rodoviaId", String(draft.rodoviaId));
-      form.append("km", draft.km);
-      form.append("cidade", draft.cidade);
-      form.append("comprimento", draft.comprimento);
-      form.append("largura", draft.largura);
-      form.append("espessura", draft.espessura);
-      form.append("lado", draft.lado);
-      form.append("observacoes", draft.observacoes);
-      form.append("status", status);
-      if (draft.fotoTicket) form.append("fotoTicket", draft.fotoTicket);
-      if (draft.fotos.antes) form.append("antes", draft.fotos.antes);
-      if (draft.fotos.durante) form.append("durante", draft.fotos.durante);
-      if (draft.fotos.depois) form.append("depois", draft.fotos.depois);
-      if (draft.fotos.trena) form.append("trena", draft.fotos.trena);
+      if (navigator.onLine) {
+        try {
+          // Com sinal fraco não deixa o operador esperando: se passar do tempo,
+          // guarda no celular. Se o envio tiver chegado mesmo assim, o reenvio
+          // usa o mesmo id e o servidor não duplica.
+          await enviarRegistro(item, 30_000);
+          return { offline: false };
+        } catch (err: any) {
+          if (err.response) {
+            const message = err.response.data?.message ?? "Não foi possível salvar o registro. Tente novamente.";
+            setSubmitError(message);
+            throw new Error(message);
+          }
+        }
+      }
 
-      const { data } = await api.post<Registro>("/registros", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      return data;
-    } catch (err: any) {
-      const message = err.response?.data?.message ?? "Não foi possível enviar o registro. Tente novamente.";
-      setSubmitError(message);
-      throw new Error(message);
+      try {
+        await adicionarNaFila(item);
+      } catch {
+        const message = "Sem internet e não foi possível guardar o registro no celular. Não feche o app e tente de novo.";
+        setSubmitError(message);
+        throw new Error(message);
+      }
+      return { offline: true };
     } finally {
       setSubmitting(false);
     }

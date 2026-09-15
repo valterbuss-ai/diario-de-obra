@@ -2,6 +2,7 @@ import { ClipboardList, Download, LogOut } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { useSincronizacao } from "../contexts/SincronizacaoContext";
 import { usePwaInstall } from "../hooks/usePwaInstall";
 import { ThemeToggle } from "./ThemeToggle";
 import { useApiList } from "../services/hooks";
@@ -23,7 +24,9 @@ const steps = [
 export function OperadorLayout({ step, title, subtitle, children }: OperadorLayoutProps) {
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
-  const { data: pendentes } = useApiList<Registro>("/registros?status=rascunho");
+  const { fila, online, versao } = useSincronizacao();
+  const { data: pendentes } = useApiList<Registro>("/registros?status=rascunho", [versao]);
+  const totalPendentes = pendentes.length + fila.length;
   const { canInstall, promptInstall } = usePwaInstall();
 
   return (
@@ -52,9 +55,9 @@ export function OperadorLayout({ step, title, subtitle, children }: OperadorLayo
               aria-label="Registros do dia"
             >
               <ClipboardList className="h-5 w-5" />
-              {pendentes.length > 0 && (
+              {totalPendentes > 0 && (
                 <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-black">
-                  {pendentes.length}
+                  {totalPendentes}
                 </span>
               )}
             </button>
@@ -90,6 +93,12 @@ export function OperadorLayout({ step, title, subtitle, children }: OperadorLayo
           ))}
         </div>
       </header>
+
+      {!online && (
+        <div className="border-b border-primary/30 bg-primary/10 px-4 py-2 text-center text-xs font-semibold text-primary">
+          Sem internet · os registros ficam guardados no celular e são enviados quando o sinal voltar
+        </div>
+      )}
 
       <main className="mx-auto max-w-xl px-4 py-6">
         <p className="mb-4 text-sm text-gray-400">{subtitle}</p>

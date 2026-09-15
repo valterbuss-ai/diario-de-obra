@@ -187,6 +187,7 @@ model Registro {
   status        StatusRegistro  @default(rascunho)
   usuarioId     Int?            @map("usuario_id")
   usuario       Usuario?        @relation(fields: [usuarioId], references: [id])
+  clienteId     String?         @unique @map("cliente_id")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
   fotos         RegistroFoto[]

@@ -1,14 +1,13 @@
 import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { PhotoSlot } from "../../components/PhotoSlot";
 import { SelectField, TextAreaField, TextField } from "../../components/FormField";
 import { useAuth } from "../../contexts/AuthContext";
 import { useRegistroDraft } from "../../contexts/RegistroContext";
-import { api } from "../../services/api";
 import { useApiList } from "../../services/hooks";
-import type { Placa, Servico, Usina } from "../../types";
+import type { Placa, Rodovia, Servico, Usina } from "../../types";
 
 const FOTOS: { tipo: "antes" | "durante" | "depois" | "trena"; label: string }[] = [
   { tipo: "antes", label: "Antes" },
@@ -21,7 +20,13 @@ export function Tela3Local() {
   const { draft, updateDraft, updateFoto, submitDraft, resetLocal, submitting, submitError } = useRegistroDraft();
   const navigate = useNavigate();
   const { usuario } = useAuth();
-  const { data: rodoviasOpcoes } = useApiList<string>("/rodovias/opcoes");
+  // Lista completa de trechos (fica guardada no celular): a cidade é achada
+  // aqui mesmo, sem depender da internet.
+  const { data: rodovias, loading: carregandoRodovias } = useApiList<Rodovia>("/rodovias");
+  const rodoviasOpcoes = useMemo(
+    () => Array.from(new Set(rodovias.map((r) => r.rodovia))).sort((a, b) => a.localeCompare(b, "pt-BR")),
+    [rodovias]
+  );
   const { data: placas } = useApiList<Placa>("/placas");
   const { data: servicos } = useApiList<Servico>(usuario?.perfil === "terceirizado" ? "/servicos-terceiros" : "/servicos");
   const { data: usinas } = useApiList<Usina>("/usinas");
@@ -43,29 +48,22 @@ export function Tela3Local() {
       return;
     }
 
-    let active = true;
-    setCidadeStatus("buscando");
-    const timer = setTimeout(() => {
-      api
-        .get("/rodovias/lookup", { params: { rodovia: draft.rodoviaNome, km } })
-        .then((res) => {
-          if (!active) return;
-          updateDraft({ cidade: res.data.cidade, rodoviaId: res.data.rodoviaId });
-          setCidadeStatus("encontrada");
-        })
-        .catch(() => {
-          if (!active) return;
-          updateDraft({ cidade: "", rodoviaId: "" });
-          setCidadeStatus("nao-encontrada");
-        });
-    }, 350);
+    if (rodovias.length === 0) {
+      setCidadeStatus(carregandoRodovias ? "buscando" : "nao-encontrada");
+      return;
+    }
 
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
+    // Mesma regra do servidor: trecho da rodovia cuja faixa de km contém o km informado.
+    const trecho = rodovias.find((r) => r.rodovia === draft.rodoviaNome && Number(r.kmInicio) <= km && Number(r.kmFim) >= km);
+    if (trecho) {
+      updateDraft({ cidade: trecho.cidade, rodoviaId: trecho.id });
+      setCidadeStatus("encontrada");
+    } else {
+      updateDraft({ cidade: "", rodoviaId: "" });
+      setCidadeStatus("nao-encontrada");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.rodoviaNome, draft.km]);
+  }, [draft.rodoviaNome, draft.km, rodovias, carregandoRodovias]);
 
   const fotosCount = FOTOS.filter((f) => draft.fotos[f.tipo]).length;
 
@@ -80,10 +78,10 @@ export function Tela3Local() {
 
   async function handleSalvar() {
     try {
-      await submitDraft("rascunho");
+      const { offline } = await submitDraft("rascunho");
       // Equipe e carga ficam para o próximo registro; só a etapa 3 é limpa.
       resetLocal();
-      navigate("/operador/dia");
+      navigate("/operador/dia", { state: { salvoNoCelular: offline } });
     } catch {
       // erro exposto via contexto (submitError)
     }

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { usePwaInstall } from "../hooks/usePwaInstall";
+import { ThemeToggle } from "./ThemeToggle";
 import { useApiList } from "../services/hooks";
 import type { Registro } from "../types";
 
@@ -44,6 +45,7 @@ export function OperadorLayout({ step, title, subtitle, children }: OperadorLayo
                 <span className="hidden sm:inline">Instalar app</span>
               </button>
             )}
+            <ThemeToggle className="rounded-lg border border-border p-2 text-gray-400 hover:text-primary hover:border-primary" />
             <button
               onClick={() => navigate("/operador/dia")}
               className="relative rounded-lg border border-border p-2 text-gray-400 hover:text-primary hover:border-primary"

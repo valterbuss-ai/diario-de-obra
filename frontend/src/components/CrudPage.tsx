@@ -110,7 +110,7 @@ export function CrudPage<T extends { id: number }>({
         </div>
         <button
           onClick={openCreate}
-          className="flex items-center gap-2 rounded-lg bg-admin px-4 py-2.5 text-sm font-semibold text-white hover:brightness-110"
+          className="flex items-center gap-2 rounded-lg bg-admin px-4 py-2.5 text-sm font-semibold text-[#fff] hover:brightness-110"
         >
           <Plus className="h-4 w-4" />
           Novo
@@ -250,7 +250,7 @@ export function CrudPage<T extends { id: number }>({
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 rounded-lg bg-admin py-2.5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-60"
+                  className="flex-1 rounded-lg bg-admin py-2.5 text-sm font-semibold text-[#fff] hover:brightness-110 disabled:opacity-60"
                 >
                   {saving ? "Salvando..." : "Salvar"}
                 </button>

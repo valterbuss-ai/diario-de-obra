@@ -1,6 +1,7 @@
 import { Camera, CheckCircle2, Download, LogOut, Sparkles } from "lucide-react";
 import { useMemo } from "react";
 import * as XLSX from "xlsx";
+import { ThemeToggle } from "../../components/ThemeToggle";
 import { useAuth } from "../../contexts/AuthContext";
 import { fileUrl } from "../../services/api";
 import { useApiList } from "../../services/hooks";
@@ -72,6 +73,10 @@ export function Planilha() {
             <Download className="h-4 w-4" />
             Exportar para Excel
           </button>
+          <ThemeToggle
+            iconClassName="h-4 w-4"
+            className="rounded-lg border border-border p-2.5 text-gray-400 hover:border-primary hover:text-primary"
+          />
           <button
             onClick={logout}
             className="rounded-lg border border-border p-2.5 text-gray-400 hover:border-primary hover:text-primary"

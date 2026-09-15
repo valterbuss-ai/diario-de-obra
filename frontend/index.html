@@ -5,6 +5,15 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0f1115" />
+    <script>
+      // Aplica o tema salvo antes do app carregar, para não piscar escuro ao abrir no tema claro.
+      try {
+        if (localStorage.getItem("diario:tema") === "claro") {
+          document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f3f4f6");
+        }
+      } catch (e) {}
+    </script>
     <title>Diário de Obra</title>
   </head>
   <body>

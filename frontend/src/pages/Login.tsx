@@ -2,6 +2,7 @@ import { HardHat, LogIn } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
 
 export function Login() {
@@ -27,7 +28,8 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-bg px-4">
+      <ThemeToggle className="absolute right-4 top-4 rounded-lg border border-border p-2 text-gray-400 hover:border-primary hover:text-primary" />
       <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-xl">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/15">

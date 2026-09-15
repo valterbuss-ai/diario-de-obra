@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 const navItems = [
   { to: "/admin", label: "Visão geral", icon: LayoutDashboard, end: true },
@@ -64,6 +65,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         <div className="border-t border-border px-4 py-4">
           <p className="truncate text-sm font-medium text-white">{usuario?.nome}</p>
           <p className="truncate text-xs text-gray-500">{usuario?.email}</p>
+          <ThemeToggle
+            comTexto
+            iconClassName="h-4 w-4"
+            className="mt-3 flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-gray-400 hover:border-admin hover:text-admin"
+          />
           <button
             onClick={logout}
             className="mt-3 flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm text-gray-400 hover:border-admin hover:text-admin"

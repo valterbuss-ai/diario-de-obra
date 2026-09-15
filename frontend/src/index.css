@@ -11,6 +11,40 @@
   --color-border: #2b303b;
 }
 
+:root {
+  color-scheme: dark;
+}
+
+/* Tema claro (melhor para ler no sol, em campo). As telas usam "text-white"
+   como texto principal e os tons de cinza como texto secundário, então no
+   tema claro essas cores viram tons escuros, junto com fundo e bordas. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg: #f3f4f6;
+  --color-surface: #ffffff;
+  --color-surface-alt: #eceef2;
+  --color-border: #d4d8df;
+  --color-white: #111827;
+  --color-gray-200: #1f2937;
+  --color-gray-300: #374151;
+  --color-gray-400: #4b5563;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #9ca3af;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+}
+
+/* Amarelo e verde da marca funcionam como fundo de botão, mas como texto
+   sobre fundo claro quase não se leem; no tema claro o texto fica mais escuro. */
+:root[data-theme="light"] .text-primary,
+:root[data-theme="light"] .hover\:text-primary:hover {
+  color: #92620a;
+}
+
+:root[data-theme="light"] .text-success {
+  color: #047857;
+}
+
 html,
 body,
 #root {
@@ -20,18 +54,12 @@ body,
 body {
   margin: 0;
   background-color: var(--color-bg);
-  color: #e6e8ec;
+  color: var(--color-gray-200);
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 * {
   box-sizing: border-box;
-}
-
-input,
-select,
-textarea {
-  color-scheme: dark;
 }
 
 ::-webkit-scrollbar {

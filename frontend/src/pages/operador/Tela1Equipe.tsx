@@ -1,4 +1,5 @@
 ﻿import { ArrowRight } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { SelectField, TextField } from "../../components/FormField";
@@ -29,24 +30,58 @@ export function Tela1Equipe() {
   const climasAtivos = climas.filter((c) => c.status === "ativo");
   const motoristasAtivos = motoristas.filter((m) => m.status === "ativo");
 
+  // No celular, caçar o nome numa lista de sugestões é ruim, então o motorista
+  // vira lista suspensa. "Outro" abre o campo de texto para um motorista ainda
+  // não cadastrado (o sistema cadastra sozinho ao salvar), como era antes.
+  const [modoOutro, setModoOutro] = useState(false);
+  const nomeNaLista = motoristasAtivos.some((m) => m.nome === draft.motoristaNome);
+  const digitandoNome = modoOutro || (draft.motoristaNome !== "" && motoristasAtivos.length > 0 && !nomeNaLista);
+
   const podeContinuar = equipePreenchida(draft);
 
   return (
     <OperadorLayout step={1} title="Nova ocorrência" subtitle="Identifique a equipe e as condições do serviço.">
       <div className="flex flex-col gap-5">
-        <TextField
+        <SelectField
           label="Motorista"
           required
-          list="motoristas-sugestoes"
-          placeholder="Nome do motorista"
-          value={draft.motoristaNome}
-          onChange={(e) => updateDraft({ motoristaNome: e.target.value })}
-        />
-        <datalist id="motoristas-sugestoes">
+          value={digitandoNome ? "__outro__" : draft.motoristaNome}
+          onChange={(e) => {
+            const valor = e.target.value;
+            setModoOutro(valor === "__outro__");
+            updateDraft({ motoristaNome: valor === "__outro__" ? "" : valor });
+          }}
+        >
+          <option value="">Selecione o motorista</option>
           {motoristasAtivos.map((m) => (
-            <option key={m.id} value={m.nome} />
+            <option key={m.id} value={m.nome}>
+              {m.nome}
+            </option>
           ))}
-        </datalist>
+          <option value="__outro__">Outro (digitar nome)</option>
+        </SelectField>
+
+        {digitandoNome && (
+          <div className="-mt-2 flex flex-col gap-2">
+            <TextField
+              label="Nome do motorista"
+              required
+              placeholder="Nome completo"
+              value={draft.motoristaNome}
+              onChange={(e) => updateDraft({ motoristaNome: e.target.value })}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setModoOutro(false);
+                updateDraft({ motoristaNome: "" });
+              }}
+              className="self-start text-sm text-gray-500 underline-offset-4 hover:text-primary hover:underline"
+            >
+              Escolher da lista
+            </button>
+          </div>
+        )}
 
         <SelectField
           label="Placa"

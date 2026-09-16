@@ -98,6 +98,55 @@ export async function listTableColumns(tableName: string): Promise<any> {
   return res.json();
 }
 
+// --- Fotos dos registros (biblioteca "Fotos do Sistema" no SharePoint) ---
+
+const SITE_PATH =
+  process.env.MS_GRAPH_SITE_PATH ?? "testecnologiadesolosltda.sharepoint.com:/sites/SistemaOperacionalTES:";
+const BIBLIOTECA_FOTOS = process.env.MS_GRAPH_BIBLIOTECA_FOTOS ?? "Fotos do Sistema";
+
+let bibliotecaFotosId: string | null = null;
+
+/** driveId da biblioteca de fotos, resolvido uma vez e guardado em memória. */
+export async function resolverBibliotecaFotos(): Promise<string> {
+  if (bibliotecaFotosId) return bibliotecaFotosId;
+
+  const res = await graphFetch(`/sites/${SITE_PATH}/drives`);
+  if (!res.ok) throw new Error(`Erro ao listar bibliotecas do site (${res.status}): ${await res.text()}`);
+
+  const { value } = (await res.json()) as { value: { id: string; name: string }[] };
+  const biblioteca = value.find((d) => d.name === BIBLIOTECA_FOTOS);
+  if (!biblioteca) throw new Error(`Biblioteca "${BIBLIOTECA_FOTOS}" não encontrada no site.`);
+
+  bibliotecaFotosId = biblioteca.id;
+  return biblioteca.id;
+}
+
+/**
+ * Envia uma foto para `caminho` (ex: "CT-2024-091/2026/09 - Setembro/16/041-antes.jpg").
+ * O Graph cria as subpastas que faltarem.
+ */
+export async function enviarFoto(
+  caminho: string,
+  conteudo: Buffer,
+  contentType: string
+): Promise<{ driveId: string; itemId: string }> {
+  const driveId = await resolverBibliotecaFotos();
+  const res = await graphFetch(`/drives/${driveId}/root:/${encodeURI(caminho)}:/content`, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: new Uint8Array(conteudo),
+  });
+  if (!res.ok) throw new Error(`Erro ao enviar foto "${caminho}" (${res.status}): ${await res.text()}`);
+
+  const item = (await res.json()) as { id: string };
+  return { driveId, itemId: item.id };
+}
+
+/** Baixa o conteúdo de uma foto já enviada, para o backend repassar ao navegador. */
+export async function baixarFoto(driveId: string, itemId: string): Promise<Response> {
+  return graphFetch(`/drives/${driveId}/items/${itemId}/content`);
+}
+
 export async function appendTableRow(tableName: string, values: (string | number | null)[]): Promise<void> {
   const res = await graphFetch(`${fileItemPath()}/workbook/tables('${encodeURIComponent(tableName)}')/rows/add`, {
     method: "POST",

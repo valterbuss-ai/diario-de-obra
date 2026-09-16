@@ -28,7 +28,12 @@ api.interceptors.response.use(
   }
 );
 
-export function fileUrl(path: string | null | undefined): string | undefined {
-  if (!path) return undefined;
-  return `${API_URL}${path}`;
+/**
+ * Link da foto guardada no SharePoint. A imagem é aberta por link direto, que não
+ * manda cabeçalho de autenticação, então o token vai na própria URL.
+ */
+export function fotoUrl(fotoId: number): string | undefined {
+  const token = localStorage.getItem("diario:token");
+  if (!token) return undefined;
+  return `${API_URL}/api/fotos/${fotoId}?token=${encodeURIComponent(token)}`;
 }

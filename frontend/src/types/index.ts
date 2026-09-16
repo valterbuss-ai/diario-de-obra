@@ -77,7 +77,9 @@ export interface Clima {
 export interface RegistroFoto {
   id: number;
   tipo: TipoFoto;
-  arquivo: string;
+  // Local do arquivo no SharePoint; nulo nas fotos antigas, que se perderam.
+  driveId: string | null;
+  itemId: string | null;
 }
 
 export interface Registro {

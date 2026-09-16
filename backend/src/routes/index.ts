@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authController } from "../controllers/authController";
 import { climaController } from "../controllers/climaController";
 import { contratoController } from "../controllers/contratoController";
+import { fotoController } from "../controllers/fotoController";
 import { motoristaController } from "../controllers/motoristaController";
 import { placaController } from "../controllers/placaController";
 import { registroController } from "../controllers/registroController";
@@ -30,6 +31,9 @@ router.use("/climas", crudRouter(climaController));
 router.get("/rodovias/opcoes", authMiddleware, rodoviaController.opcoes);
 router.get("/rodovias/lookup", authMiddleware, rodoviaController.lookup);
 router.use("/rodovias", crudRouter(rodoviaController));
+
+// Autenticação própria (aceita token pela URL): a foto é aberta por link direto.
+router.get("/fotos/:id", fotoController.mostrar);
 
 router.get("/registros", authMiddleware, registroController.list);
 router.post("/registros/enviar-lote", authMiddleware, registroController.enviarLote);

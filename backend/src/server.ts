@@ -2,13 +2,11 @@ import cors from "cors";
 import "dotenv/config";
 import express from "express";
 import { router } from "./routes";
-import { uploadsDir } from "./middleware/upload";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
-app.use("/uploads", express.static(uploadsDir));
 app.use("/api", router);
 
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

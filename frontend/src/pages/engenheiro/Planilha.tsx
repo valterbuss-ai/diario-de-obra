@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import * as XLSX from "xlsx";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { useAuth } from "../../contexts/AuthContext";
-import { fileUrl } from "../../services/api";
+import { fotoUrl } from "../../services/api";
 import { useApiList } from "../../services/hooks";
 import type { Registro } from "../../types";
 
@@ -163,13 +163,10 @@ export function Planilha() {
                       <td className="px-4 py-3 text-gray-200">
                         <div className="flex items-center gap-1.5">
                           {r.numeroTicket}
-                          {r.fotoTicket ? (
-                            <a href={fileUrl(r.fotoTicket)} target="_blank" rel="noreferrer" title="Ver foto do ticket">
-                              <Camera className="h-3.5 w-3.5 text-success" />
-                            </a>
-                          ) : (
-                            <Camera className="h-3.5 w-3.5 text-gray-600" />
-                          )}
+                          {/* A foto do ticket ainda não é arquivada (pasta a definir
+                              com o cliente), então o ícone fica apagado por enquanto. */}
+                          <Camera className="h-3.5 w-3.5 text-gray-600" aria-label="Foto do ticket não disponível" />
+                          <span className="sr-only">Foto do ticket não disponível</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-200">{numeroPtBr(r.toneladas)} t</td>
@@ -182,14 +179,29 @@ export function Planilha() {
                       </td>
                       <td className="px-4 py-3 text-gray-200 capitalize">{r.lado}</td>
                       <td className="px-4 py-3">
-                        <span
-                          className={`flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            fotosCompletas ? "bg-success/15 text-success" : "bg-red-500/15 text-red-400"
-                          }`}
-                        >
-                          {fotosCompletas && <CheckCircle2 className="h-3.5 w-3.5" />}
-                          {r.fotos.length}/4
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`flex w-fit items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                              fotosCompletas ? "bg-success/15 text-success" : "bg-red-500/15 text-red-400"
+                            }`}
+                          >
+                            {fotosCompletas && <CheckCircle2 className="h-3.5 w-3.5" />}
+                            {r.fotos.length}/4
+                          </span>
+                          {/* Cada foto abre direto do SharePoint. */}
+                          {r.fotos.map((f) => (
+                            <a
+                              key={f.id}
+                              href={fotoUrl(f.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`Ver foto: ${f.tipo}`}
+                              className="text-gray-400 hover:text-primary"
+                            >
+                              <Camera className="h-3.5 w-3.5" />
+                            </a>
+                          ))}
+                        </div>
                       </td>
                     </tr>
                   );

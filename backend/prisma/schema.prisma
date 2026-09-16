@@ -200,10 +200,24 @@ model RegistroFoto {
   registroId Int       @map("registro_id")
   registro   Registro  @relation(fields: [registroId], references: [id], onDelete: Cascade)
   tipo       TipoFoto
-  arquivo    String
+  // Local do arquivo na biblioteca "Fotos do Sistema" do SharePoint do cliente.
+  // Registros antigos (fotos perdidas no disco do Render) ficam com os dois nulos.
+  driveId    String?   @map("drive_id")
+  itemId     String?   @map("item_id")
   createdAt  DateTime  @default(now()) @map("created_at")
 
   @@map("registro_fotos")
+}
+
+// Numeração das fotos: sequência única por mês, somando todos os contratos.
+// Guardada no banco para dois registros simultâneos nunca receberem o mesmo número.
+model ContadorFotoMensal {
+  ano           Int
+  mes           Int
+  proximoNumero Int @map("proximo_numero")
+
+  @@id([ano, mes])
+  @@map("contadores_foto_mensal")
 }
 
 model Usuario {

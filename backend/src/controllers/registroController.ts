@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
+import { enviarFoto } from "../lib/msGraph";
 import { enviarRegistroParaPlanilha } from "../lib/n8nWebhook";
 
 const createSchema = z.object({
@@ -29,8 +30,60 @@ const createSchema = z.object({
 
 type UploadedFiles = Record<string, Express.Multer.File[]>;
 
-function fileUrl(file?: Express.Multer.File) {
-  return file ? `/uploads/${file.filename}` : null;
+const MESES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
+
+/** Caracteres que o SharePoint não aceita em nome de pasta/arquivo. */
+function nomeSeguro(valor: string) {
+  return valor.replace(/["*:<>?/\\|#%]/g, "-").replace(/\s+/g, " ").trim();
+}
+
+/** Ex: "CT-2024-091/2026/09 - Setembro/16" */
+function pastaDoRegistro(codigoContrato: string, data: Date) {
+  const mes = data.getMonth();
+  return [
+    nomeSeguro(codigoContrato),
+    String(data.getFullYear()),
+    `${String(mes + 1).padStart(2, "0")} - ${MESES[mes]}`,
+    String(data.getDate()).padStart(2, "0"),
+  ].join("/");
+}
+
+function extensaoDaFoto(file: Express.Multer.File) {
+  const doNome = file.originalname.match(/\.[a-z0-9]+$/i);
+  if (doNome) return doNome[0].toLowerCase();
+  if (file.mimetype === "image/png") return ".png";
+  if (file.mimetype === "image/webp") return ".webp";
+  return ".jpg";
+}
+
+/**
+ * Reserva `quantidade` números da sequência do mês (única para todos os contratos)
+ * e devolve o primeiro da faixa. O INSERT ... ON CONFLICT é atômico: dois registros
+ * salvos ao mesmo tempo nunca recebem o mesmo número.
+ */
+async function reservarNumerosDoMes(ano: number, mes: number, quantidade: number): Promise<number> {
+  const linhas = await prisma.$queryRaw<{ proximo_numero: number }[]>`
+    INSERT INTO contadores_foto_mensal (ano, mes, proximo_numero)
+    VALUES (${ano}, ${mes}, ${quantidade})
+    ON CONFLICT (ano, mes)
+    DO UPDATE SET proximo_numero = contadores_foto_mensal.proximo_numero + ${quantidade}
+    RETURNING proximo_numero
+  `;
+  const ultimo = Number(linhas[0].proximo_numero);
+  return ultimo - quantidade + 1;
 }
 
 const statusFilterSchema = z.enum(["rascunho", "enviado"]).optional();
@@ -136,6 +189,44 @@ export const registroController = {
           })
         ).id;
 
+    // Fotos vão para o SharePoint do cliente, em
+    // <CONTRATO>/<ANO>/<MÊS>/<DIA>/<número do mês>-<tipo>.<ext>. A foto do ticket
+    // ainda não tem pasta definida pelo cliente, então não é arquivada nesta etapa.
+    const fotosRecebidas = [
+      antes && { tipo: "antes" as const, file: antes },
+      durante && { tipo: "durante" as const, file: durante },
+      depois && { tipo: "depois" as const, file: depois },
+      trena && { tipo: "trena" as const, file: trena },
+    ].filter(Boolean) as { tipo: "antes" | "durante" | "depois" | "trena"; file: Express.Multer.File }[];
+
+    const dataRegistro = data.data ?? new Date();
+    let fotosParaCriar: { tipo: "antes" | "durante" | "depois" | "trena"; driveId: string; itemId: string }[] = [];
+
+    if (fotosRecebidas.length > 0) {
+      try {
+        const primeiroNumero = await reservarNumerosDoMes(
+          dataRegistro.getFullYear(),
+          dataRegistro.getMonth() + 1,
+          fotosRecebidas.length
+        );
+        const pasta = pastaDoRegistro(contrato.codigo, dataRegistro);
+
+        fotosParaCriar = await Promise.all(
+          fotosRecebidas.map(async ({ tipo, file }, indice) => {
+            const numero = String(primeiroNumero + indice).padStart(3, "0");
+            const caminho = `${pasta}/${numero}-${tipo}${extensaoDaFoto(file)}`;
+            const { driveId, itemId } = await enviarFoto(caminho, file.buffer, file.mimetype);
+            return { tipo, driveId, itemId };
+          })
+        );
+      } catch (err) {
+        console.error("[registros] Erro ao enviar fotos para o SharePoint:", err);
+        return res.status(502).json({
+          message: "Não foi possível guardar as fotos no SharePoint. O registro não foi salvo — tente de novo.",
+        });
+      }
+    }
+
     const registro = await prisma.registro.create({
       data: {
         motoristaId,
@@ -146,7 +237,7 @@ export const registroController = {
         usinaId: data.usinaId,
         numeroTicket: data.numeroTicket,
         toneladas: data.toneladas,
-        fotoTicket: fileUrl(fotoTicket),
+        fotoTicket: null,
         rodoviaId: data.rodoviaId,
         km: data.km,
         cidade: data.cidade,
@@ -159,14 +250,7 @@ export const registroController = {
         usuarioId: req.user?.id ?? null,
         clienteId: data.clienteId ?? null,
         data: data.data,
-        fotos: {
-          create: [
-            antes && { tipo: "antes" as const, arquivo: fileUrl(antes)! },
-            durante && { tipo: "durante" as const, arquivo: fileUrl(durante)! },
-            depois && { tipo: "depois" as const, arquivo: fileUrl(depois)! },
-            trena && { tipo: "trena" as const, arquivo: fileUrl(trena)! },
-          ].filter(Boolean) as { tipo: "antes" | "durante" | "depois" | "trena"; arquivo: string }[],
-        },
+        fotos: { create: fotosParaCriar },
       },
       include: {
         fotos: true,

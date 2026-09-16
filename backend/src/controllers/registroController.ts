@@ -221,8 +221,11 @@ export const registroController = {
         );
       } catch (err) {
         console.error("[registros] Erro ao enviar fotos para o SharePoint:", err);
+        // O motivo vai junto na resposta: sem acesso ao log do servidor, é a única
+        // forma de saber se foi credencial, permissão ou indisponibilidade do Graph.
+        const motivo = err instanceof Error ? err.message : String(err);
         return res.status(502).json({
-          message: "Não foi possível guardar as fotos no SharePoint. O registro não foi salvo — tente de novo.",
+          message: `Não foi possível guardar as fotos no SharePoint. O registro não foi salvo — tente de novo. (${motivo.slice(0, 300)})`,
         });
       }
     }

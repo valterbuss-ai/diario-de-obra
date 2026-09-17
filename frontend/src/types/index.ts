@@ -3,7 +3,7 @@ export type StatusAtivaUsina = "ativa" | "inativa";
 export type StatusContrato = "ativo" | "encerrado";
 export type StatusRegistro = "rascunho" | "enviado";
 export type LadoPista = "direito" | "esquerdo";
-export type TipoFoto = "antes" | "durante" | "depois" | "trena";
+export type TipoFoto = "antes" | "durante" | "depois" | "trena" | "ticket";
 export type PerfilUsuario = "operador" | "gestor" | "engenheiro" | "terceirizado";
 export type TipoPlaca = "propria" | "terceirizada";
 export type TipoServico = "interno" | "terceirizado";
@@ -93,7 +93,6 @@ export interface Registro {
   usina: Usina;
   numeroTicket: string;
   toneladas: string;
-  fotoTicket: string | null;
   rodovia: Rodovia;
   km: string;
   cidade: string;

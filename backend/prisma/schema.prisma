@@ -37,6 +37,7 @@ enum TipoFoto {
   durante
   depois
   trena
+  ticket
 }
 
 enum PerfilUsuario {
@@ -174,7 +175,6 @@ model Registro {
   usina         Usina           @relation(fields: [usinaId], references: [id])
   numeroTicket  String          @map("numero_ticket")
   toneladas     Decimal
-  fotoTicket    String?         @map("foto_ticket")
   rodoviaId     Int             @map("rodovia_id")
   rodovia       Rodovia         @relation(fields: [rodoviaId], references: [id])
   km            Decimal

@@ -128,18 +128,41 @@ export async function resolverBibliotecaFotos(): Promise<string> {
 export async function enviarFoto(
   caminho: string,
   conteudo: Buffer,
-  contentType: string
-): Promise<{ driveId: string; itemId: string }> {
+  contentType: string,
+  opcoes: { naoSobrescrever?: boolean } = {}
+): Promise<{ driveId: string; itemId: string; caminho: string }> {
   const driveId = await resolverBibliotecaFotos();
-  const res = await graphFetch(`/drives/${driveId}/root:/${encodeURI(caminho)}:/content`, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: new Uint8Array(conteudo),
-  });
-  if (!res.ok) throw new Error(`Erro ao enviar foto "${caminho}" (${res.status}): ${await res.text()}`);
 
-  const item = (await res.json()) as { id: string };
-  return { driveId, itemId: item.id };
+  const enviar = (alvo: string, falharSeExistir: boolean) =>
+    graphFetch(
+      `/drives/${driveId}/root:/${encodeURI(alvo)}:/content${falharSeExistir ? "?@microsoft.graph.conflictBehavior=fail" : ""}`,
+      { method: "PUT", headers: { "Content-Type": contentType }, body: new Uint8Array(conteudo) }
+    );
+
+  if (!opcoes.naoSobrescrever) {
+    const res = await enviar(caminho, false);
+    if (!res.ok) throw new Error(`Erro ao enviar foto "${caminho}" (${res.status}): ${await res.text()}`);
+    const item = (await res.json()) as { id: string };
+    return { driveId, itemId: item.id, caminho };
+  }
+
+  // Nome já usado (ex: dois registros com o mesmo número de ticket no mesmo dia):
+  // guarda os dois, virando "48213.jpg" e "48213-2.jpg". O conflictBehavior=fail é
+  // atômico no Graph, então dois envios ao mesmo tempo não se sobrescrevem.
+  const ponto = caminho.lastIndexOf(".");
+  const base = ponto > 0 ? caminho.slice(0, ponto) : caminho;
+  const extensao = ponto > 0 ? caminho.slice(ponto) : "";
+
+  for (let tentativa = 1; tentativa <= 20; tentativa++) {
+    const alvo = tentativa === 1 ? caminho : `${base}-${tentativa}${extensao}`;
+    const res = await enviar(alvo, true);
+    if (res.ok) {
+      const item = (await res.json()) as { id: string };
+      return { driveId, itemId: item.id, caminho: alvo };
+    }
+    if (res.status !== 409) throw new Error(`Erro ao enviar foto "${alvo}" (${res.status}): ${await res.text()}`);
+  }
+  throw new Error(`Não foi possível gravar "${caminho}": já existem 20 arquivos com esse nome na pasta.`);
 }
 
 /** Baixa o conteúdo de uma foto já enviada, para o backend repassar ao navegador. */

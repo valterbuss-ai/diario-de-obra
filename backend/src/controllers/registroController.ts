@@ -200,7 +200,7 @@ export const registroController = {
     ].filter(Boolean) as { tipo: "antes" | "durante" | "depois" | "trena"; file: Express.Multer.File }[];
 
     const dataRegistro = data.data ?? new Date();
-    let fotosParaCriar: { tipo: "antes" | "durante" | "depois" | "trena"; driveId: string; itemId: string }[] = [];
+    let fotosParaCriar: { tipo: "antes" | "durante" | "depois" | "trena" | "ticket"; driveId: string; itemId: string }[] = [];
 
     if (fotosRecebidas.length > 0) {
       try {
@@ -230,6 +230,25 @@ export const registroController = {
       }
     }
 
+    // Foto do ticket: árvore separada, nome = número do ticket, e sem consumir
+    // número da sequência mensal das fotos de serviço.
+    if (fotoTicket) {
+      try {
+        const pastaTicket = `Tickets/${pastaDoRegistro(contrato.codigo, dataRegistro)}`;
+        const caminho = `${pastaTicket}/${nomeSeguro(data.numeroTicket)}${extensaoDaFoto(fotoTicket)}`;
+        const { driveId, itemId } = await enviarFoto(caminho, fotoTicket.buffer, fotoTicket.mimetype, {
+          naoSobrescrever: true,
+        });
+        fotosParaCriar.push({ tipo: "ticket", driveId, itemId });
+      } catch (err) {
+        console.error("[registros] Erro ao enviar a foto do ticket para o SharePoint:", err);
+        const motivo = err instanceof Error ? err.message : String(err);
+        return res.status(502).json({
+          message: `Não foi possível guardar a foto do ticket no SharePoint. O registro não foi salvo — tente de novo. (${motivo.slice(0, 300)})`,
+        });
+      }
+    }
+
     const registro = await prisma.registro.create({
       data: {
         motoristaId,
@@ -240,7 +259,6 @@ export const registroController = {
         usinaId: data.usinaId,
         numeroTicket: data.numeroTicket,
         toneladas: data.toneladas,
-        fotoTicket: null,
         rodoviaId: data.rodoviaId,
         km: data.km,
         cidade: data.cidade,

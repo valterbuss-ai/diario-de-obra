@@ -48,8 +48,8 @@ export function Planilha() {
       Cidade: r.cidade,
       "C×L×E": `${numeroPtBr(r.comprimento)}×${numeroPtBr(r.largura)}×${numeroPtBr(r.espessura, 2)}`,
       Lado: r.lado === "direito" ? "Direito" : "Esquerdo",
-      Fotos: `${r.fotos.length}/4`,
-      "Ticket anexado": r.fotoTicket ? "Sim" : "Não",
+      Fotos: `${r.fotos.filter((f) => f.tipo !== "ticket").length}/4`,
+      "Ticket anexado": r.fotos.some((f) => f.tipo === "ticket") ? "Sim" : "Não",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(linhasExcel);
@@ -127,7 +127,9 @@ export function Planilha() {
                 !error &&
                 linhas.map((r) => {
                   const isNovo = Date.now() - new Date(r.createdAt).getTime() < RECENTE_MS;
-                  const fotosCompletas = r.fotos.length >= 4;
+                  const fotosServico = r.fotos.filter((f) => f.tipo !== "ticket");
+                  const fotoDoTicket = r.fotos.find((f) => f.tipo === "ticket");
+                  const fotosCompletas = fotosServico.length >= 4;
                   return (
                     <tr
                       key={r.id}
@@ -163,10 +165,13 @@ export function Planilha() {
                       <td className="px-4 py-3 text-gray-200">
                         <div className="flex items-center gap-1.5">
                           {r.numeroTicket}
-                          {/* A foto do ticket ainda não é arquivada (pasta a definir
-                              com o cliente), então o ícone fica apagado por enquanto. */}
-                          <Camera className="h-3.5 w-3.5 text-gray-600" aria-label="Foto do ticket não disponível" />
-                          <span className="sr-only">Foto do ticket não disponível</span>
+                          {fotoDoTicket ? (
+                            <a href={fotoUrl(fotoDoTicket.id)} target="_blank" rel="noreferrer" title="Ver foto do ticket">
+                              <Camera className="h-3.5 w-3.5 text-success" />
+                            </a>
+                          ) : (
+                            <Camera className="h-3.5 w-3.5 text-gray-600" aria-label="Sem foto do ticket" />
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-200">{numeroPtBr(r.toneladas)} t</td>
@@ -186,10 +191,10 @@ export function Planilha() {
                             }`}
                           >
                             {fotosCompletas && <CheckCircle2 className="h-3.5 w-3.5" />}
-                            {r.fotos.length}/4
+                            {fotosServico.length}/4
                           </span>
                           {/* Cada foto abre direto do SharePoint. */}
-                          {r.fotos.map((f) => (
+                          {fotosServico.map((f) => (
                             <a
                               key={f.id}
                               href={fotoUrl(f.id)}

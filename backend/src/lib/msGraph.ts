@@ -165,6 +165,18 @@ export async function enviarFoto(
   throw new Error(`Não foi possível gravar "${caminho}": já existem 20 arquivos com esse nome na pasta.`);
 }
 
+/**
+ * Renomeia um arquivo já enviado. Usado para numerar a foto só depois que o
+ * envio deu certo, para um envio que falha não queimar número da sequência.
+ */
+export async function renomearItem(driveId: string, itemId: string, novoNome: string): Promise<void> {
+  const res = await graphFetch(`/drives/${driveId}/items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name: novoNome }),
+  });
+  if (!res.ok) throw new Error(`Erro ao renomear para "${novoNome}" (${res.status}): ${await res.text()}`);
+}
+
 /** Baixa o conteúdo de uma foto já enviada, para o backend repassar ao navegador. */
 export async function baixarFoto(driveId: string, itemId: string): Promise<Response> {
   return graphFetch(`/drives/${driveId}/items/${itemId}/content`);

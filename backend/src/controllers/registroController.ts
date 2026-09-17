@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { enviarFoto } from "../lib/msGraph";
+import { enviarFoto, renomearItem } from "../lib/msGraph";
 import { enviarRegistroParaPlanilha } from "../lib/n8nWebhook";
 
 const createSchema = z.object({
@@ -204,19 +204,36 @@ export const registroController = {
 
     if (fotosRecebidas.length > 0) {
       try {
+        const pasta = pastaDoRegistro(contrato.codigo, dataRegistro);
+        const prefixoTemporario = `tmp-${data.clienteId ?? Date.now()}`;
+
+        // Sobe com nome temporário primeiro: assim um envio que falha não consome
+        // números da sequência do mês (antes, a numeração ficava com buracos).
+        const enviadas = await Promise.all(
+          fotosRecebidas.map(async ({ tipo, file }) => {
+            const extensao = extensaoDaFoto(file);
+            const caminho = `${pasta}/${prefixoTemporario}-${tipo}${extensao}`;
+            const { driveId, itemId } = await enviarFoto(caminho, file.buffer, file.mimetype);
+            return { tipo, driveId, itemId, extensao };
+          })
+        );
+
+        // Com todas as fotos no lugar, agora sim a numeração é consumida.
         const primeiroNumero = await reservarNumerosDoMes(
           dataRegistro.getFullYear(),
           dataRegistro.getMonth() + 1,
-          fotosRecebidas.length
+          enviadas.length
         );
-        const pasta = pastaDoRegistro(contrato.codigo, dataRegistro);
 
         fotosParaCriar = await Promise.all(
-          fotosRecebidas.map(async ({ tipo, file }, indice) => {
+          enviadas.map(async (foto, indice) => {
             const numero = String(primeiroNumero + indice).padStart(3, "0");
-            const caminho = `${pasta}/${numero}-${tipo}${extensaoDaFoto(file)}`;
-            const { driveId, itemId } = await enviarFoto(caminho, file.buffer, file.mimetype);
-            return { tipo, driveId, itemId };
+            // Se a renomeação falhar, a foto continua acessível (a exibição usa o
+            // identificador do arquivo, não o nome) — só fica com o nome temporário.
+            await renomearItem(foto.driveId, foto.itemId, `${numero}-${foto.tipo}${foto.extensao}`).catch((erroRename) =>
+              console.error(`[registros] Não consegui renomear a foto ${foto.tipo} para ${numero}:`, erroRename)
+            );
+            return { tipo: foto.tipo, driveId: foto.driveId, itemId: foto.itemId };
           })
         );
       } catch (err) {

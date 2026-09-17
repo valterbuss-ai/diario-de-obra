@@ -63,9 +63,11 @@ export function Tela1Equipe() {
 
         {digitandoNome && (
           <div className="-mt-2 flex flex-col gap-2">
+            {/* autoFocus abre o teclado direto: sem isso o campo passa despercebido no celular. */}
             <TextField
               label="Nome do motorista"
               required
+              autoFocus
               placeholder="Nome completo"
               value={draft.motoristaNome}
               onChange={(e) => updateDraft({ motoristaNome: e.target.value })}

@@ -186,6 +186,7 @@ export function Tela3Local() {
             <option value="">Selecione o lado</option>
             <option value="direito">Lado Direito</option>
             <option value="esquerdo">Lado Esquerdo</option>
+            <option value="ambos">Ambos os lados</option>
           </SelectField>
 
           <TextAreaField

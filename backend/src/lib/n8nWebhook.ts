@@ -45,7 +45,7 @@ function montarPayload(registro: RegistroCompleto): RegistroWebhookPayload {
     rodovia: registro.rodovia.rodovia,
     cidade: registro.cidade,
     km: Number(registro.km),
-    lado: registro.lado === "direito" ? "Direito" : "Esquerdo",
+    lado: { direito: "Direito", esquerdo: "Esquerdo", ambos: "Ambos" }[registro.lado] ?? registro.lado,
     servico: registro.servico.nome,
     comprimento: Number(registro.comprimento),
     largura: Number(registro.largura),

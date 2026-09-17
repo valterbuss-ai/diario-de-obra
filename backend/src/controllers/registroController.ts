@@ -19,7 +19,7 @@ const createSchema = z.object({
   comprimento: z.coerce.number().positive(),
   largura: z.coerce.number().positive(),
   espessura: z.coerce.number().positive(),
-  lado: z.enum(["direito", "esquerdo"]),
+  lado: z.enum(["direito", "esquerdo", "ambos"]),
   observacoes: z.string().optional().nullable(),
   status: z.enum(["rascunho", "enviado"]).optional(),
   // Enviados pelo app: id gerado no celular (evita duplicar quando o envio é

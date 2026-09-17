@@ -47,7 +47,7 @@ export function Planilha() {
       Km: numeroPtBr(r.km),
       Cidade: r.cidade,
       "C×L×E": `${numeroPtBr(r.comprimento)}×${numeroPtBr(r.largura)}×${numeroPtBr(r.espessura, 2)}`,
-      Lado: r.lado === "direito" ? "Direito" : "Esquerdo",
+      Lado: { direito: "Direito", esquerdo: "Esquerdo", ambos: "Ambos" }[r.lado] ?? r.lado,
       Fotos: `${r.fotos.filter((f) => f.tipo !== "ticket").length}/4`,
       "Ticket anexado": r.fotos.some((f) => f.tipo === "ticket") ? "Sim" : "Não",
     }));

@@ -30,6 +30,7 @@ enum StatusRegistro {
 enum LadoPista {
   direito
   esquerdo
+  ambos
 }
 
 enum TipoFoto {

@@ -181,17 +181,9 @@ export const registroController = {
       return res.status(400).json({ message: "Este serviço não está disponível para o seu perfil." });
     }
 
-    const motoristaId = motorista
-      ? motorista.id
-      : (
-          await prisma.motorista.create({
-            data: { nome: data.motoristaNome, cpf: `PENDENTE-${Date.now()}`, cnh: "PENDENTE", status: "ativo" },
-          })
-        ).id;
-
     // Fotos vão para o SharePoint do cliente, em
     // <CONTRATO>/<ANO>/<MÊS>/<DIA>/<número do mês>-<tipo>.<ext>. A foto do ticket
-    // ainda não tem pasta definida pelo cliente, então não é arquivada nesta etapa.
+    // vai para a árvore separada "Tickets/..." (ver mais abaixo).
     const fotosRecebidas = [
       antes && { tipo: "antes" as const, file: antes },
       durante && { tipo: "durante" as const, file: durante },
@@ -266,40 +258,53 @@ export const registroController = {
       }
     }
 
-    const registro = await prisma.registro.create({
-      data: {
-        motoristaId,
-        placaId: data.placaId,
-        contratoId: data.contratoId,
-        servicoId: data.servicoId,
-        climaId: data.climaId,
-        usinaId: data.usinaId,
-        numeroTicket: data.numeroTicket,
-        toneladas: data.toneladas,
-        rodoviaId: data.rodoviaId,
-        km: data.km,
-        cidade: data.cidade,
-        comprimento: data.comprimento,
-        largura: data.largura,
-        espessura: data.espessura,
-        lado: data.lado,
-        observacoes: data.observacoes ?? null,
-        status,
-        usuarioId: req.user?.id ?? null,
-        clienteId: data.clienteId ?? null,
-        data: data.data,
-        fotos: { create: fotosParaCriar },
-      },
-      include: {
-        fotos: true,
-        contrato: true,
-        placa: true,
-        servico: true,
-        clima: true,
-        usina: true,
-        rodovia: true,
-        usuario: { select: { id: true, nome: true, perfil: true } },
-      },
+    // O motorista novo é cadastrado junto com o registro, na mesma transação.
+    // Antes ele era criado antes do envio das fotos e ficava sozinho no cadastro
+    // quando o envio falhava (foi assim que "Teste Integracao Fotos" apareceu).
+    const registro = await prisma.$transaction(async (tx) => {
+      const motoristaId = motorista
+        ? motorista.id
+        : (
+            await tx.motorista.create({
+              data: { nome: data.motoristaNome, cpf: `PENDENTE-${Date.now()}`, cnh: "PENDENTE", status: "ativo" },
+            })
+          ).id;
+
+      return tx.registro.create({
+        data: {
+          motoristaId,
+          placaId: data.placaId,
+          contratoId: data.contratoId,
+          servicoId: data.servicoId,
+          climaId: data.climaId,
+          usinaId: data.usinaId,
+          numeroTicket: data.numeroTicket,
+          toneladas: data.toneladas,
+          rodoviaId: data.rodoviaId,
+          km: data.km,
+          cidade: data.cidade,
+          comprimento: data.comprimento,
+          largura: data.largura,
+          espessura: data.espessura,
+          lado: data.lado,
+          observacoes: data.observacoes ?? null,
+          status,
+          usuarioId: req.user?.id ?? null,
+          clienteId: data.clienteId ?? null,
+          data: data.data,
+          fotos: { create: fotosParaCriar },
+        },
+        include: {
+          fotos: true,
+          contrato: true,
+          placa: true,
+          servico: true,
+          clima: true,
+          usina: true,
+          rodovia: true,
+          usuario: { select: { id: true, nome: true, perfil: true } },
+        },
+      });
     });
 
     res.status(201).json(registro);

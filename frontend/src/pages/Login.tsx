@@ -109,6 +109,9 @@ export function Login() {
           <p>operador@obra.com · op123 (operador)</p>
           <p>engenheiro@obra.com · eng123 (engenheiro)</p>
         </div>
+
+        {/* Dá para conferir num olhar se o aparelho pegou a versão nova. */}
+        <p className="mt-3 text-center text-[11px] text-gray-600">Versão {__VERSAO_APP__}</p>
       </div>
     </div>
   );

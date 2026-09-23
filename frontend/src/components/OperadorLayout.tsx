@@ -36,6 +36,8 @@ export function OperadorLayout({ step, title, subtitle, children }: OperadorLayo
           <div>
             <p className="text-xs text-gray-400">Diário de Obra · {usuario?.nome}</p>
             <h1 className="text-lg font-semibold text-white">{title}</h1>
+            {/* Dá para o operador dizer por telefone qual versão está no aparelho. */}
+            <p className="text-[10px] text-gray-600">v{__VERSAO_APP__}</p>
           </div>
           <div className="flex items-center gap-2">
             {canInstall && (

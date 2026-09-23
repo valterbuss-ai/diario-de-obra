@@ -1,5 +1,6 @@
 import { Navigate, Route, BrowserRouter as Router, Routes } from "react-router-dom";
 import { AdminLayout } from "./components/AdminLayout";
+import { AtualizacaoDoApp } from "./components/AtualizacaoDoApp";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { RegistroProvider } from "./contexts/RegistroContext";
@@ -36,6 +37,7 @@ export default function App() {
       <SincronizacaoProvider>
       <RegistroProvider>
         <Router>
+          <AtualizacaoDoApp />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Home />} />

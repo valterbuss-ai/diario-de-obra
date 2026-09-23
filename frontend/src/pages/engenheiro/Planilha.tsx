@@ -5,6 +5,7 @@ import { ThemeToggle } from "../../components/ThemeToggle";
 import { useAuth } from "../../contexts/AuthContext";
 import { fotoUrl } from "../../services/api";
 import { useApiList } from "../../services/hooks";
+import { localDoRegistro } from "../../types";
 import type { Registro } from "../../types";
 
 function numeroPtBr(value: string, digits = 1) {
@@ -43,8 +44,8 @@ export function Planilha() {
       Ticket: r.numeroTicket,
       "Ton.": numeroPtBr(r.toneladas),
       Contrato: r.contrato.codigo,
-      Rodovia: r.rodovia.rodovia,
-      Km: numeroPtBr(r.km),
+      "Rodovia / Logradouro": localDoRegistro(r),
+      Km: r.km ? numeroPtBr(r.km) : "",
       Cidade: r.cidade,
       "C×L×E": `${numeroPtBr(r.comprimento)}×${numeroPtBr(r.largura)}×${numeroPtBr(r.espessura, 2)}`,
       Lado: { direito: "Direito", esquerdo: "Esquerdo", ambos: "Ambos" }[r.lado] ?? r.lado,
@@ -92,7 +93,7 @@ export function Planilha() {
           <table className="w-full whitespace-nowrap text-left text-sm">
             <thead>
               <tr className="border-b border-border text-gray-400">
-                {["Data", "Origem", "Motorista", "Placa", "Serviço", "Clima", "Usina", "Ticket", "Ton.", "Contrato", "Rodovia", "Km", "Cidade", "C×L×E", "Lado", "Fotos"].map(
+                {["Data", "Origem", "Motorista", "Placa", "Serviço", "Clima", "Usina", "Ticket", "Ton.", "Contrato", "Rodovia / Logradouro", "Km", "Cidade", "C×L×E", "Lado", "Fotos"].map(
                   (h) => (
                     <th key={h} className="px-4 py-3 font-medium">
                       {h}
@@ -176,8 +177,8 @@ export function Planilha() {
                       </td>
                       <td className="px-4 py-3 text-gray-200">{numeroPtBr(r.toneladas)} t</td>
                       <td className="px-4 py-3 text-gray-200">{r.contrato.codigo}</td>
-                      <td className="px-4 py-3 text-gray-200">{r.rodovia.rodovia}</td>
-                      <td className="px-4 py-3 text-gray-200">{numeroPtBr(r.km)}</td>
+                      <td className="px-4 py-3 text-gray-200">{localDoRegistro(r)}</td>
+                      <td className="px-4 py-3 text-gray-200">{r.km ? numeroPtBr(r.km) : "—"}</td>
                       <td className="px-4 py-3 text-gray-200">{r.cidade}</td>
                       <td className="px-4 py-3 text-gray-200">
                         {numeroPtBr(r.comprimento)}×{numeroPtBr(r.largura)}×{numeroPtBr(r.espessura, 2)}

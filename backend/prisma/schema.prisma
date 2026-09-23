@@ -27,6 +27,13 @@ enum StatusRegistro {
   enviado
 }
 
+// Contrato de prefeitura é executado em área urbana: não há rodovia nem km, o
+// operador digita o logradouro e o município vem do cadastro do contrato.
+enum TipoLocalContrato {
+  rodovia
+  logradouro
+}
+
 enum LadoPista {
   direito
   esquerdo
@@ -92,6 +99,10 @@ model Contrato {
   codigo         String          @unique
   orgao          String
   descricao      String
+  tipoLocal      TipoLocalContrato @default(rodovia) @map("tipo_local")
+  // Só nos contratos de logradouro: é o município de todo registro do contrato,
+  // já que o operador não informa cidade em serviço urbano.
+  municipio      String?
   vigenciaInicio DateTime        @map("vigencia_inicio")
   vigenciaFim    DateTime        @map("vigencia_fim")
   status         StatusContrato  @default(ativo)
@@ -176,9 +187,13 @@ model Registro {
   usina         Usina           @relation(fields: [usinaId], references: [id])
   numeroTicket  String          @map("numero_ticket")
   toneladas     Decimal
-  rodoviaId     Int             @map("rodovia_id")
-  rodovia       Rodovia         @relation(fields: [rodoviaId], references: [id])
-  km            Decimal
+  // Contrato de rodovia: rodoviaId e km preenchidos, logradouro nulo. Contrato de
+  // logradouro (prefeitura): logradouro preenchido, rodoviaId e km nulos. A cidade
+  // é sempre preenchida — no logradouro ela vem de contrato.municipio.
+  rodoviaId     Int?            @map("rodovia_id")
+  rodovia       Rodovia?        @relation(fields: [rodoviaId], references: [id])
+  km            Decimal?
+  logradouro    String?
   cidade        String
   comprimento   Decimal
   largura       Decimal

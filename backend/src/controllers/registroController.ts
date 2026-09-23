@@ -4,6 +4,15 @@ import { prisma } from "../lib/prisma";
 import { enviarFoto, renomearItem } from "../lib/msGraph";
 import { enviarRegistroParaPlanilha } from "../lib/n8nWebhook";
 
+/**
+ * O app manda tudo por FormData, então campo não preenchido chega como "". Sem
+ * isto, z.coerce.number() transformaria "" em 0 silenciosamente — e um km 0
+ * fantasma iria parar no banco e na planilha do cliente.
+ */
+function opcionalDoFormulario<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((v) => (v === "" || v === null ? undefined : v), schema.optional());
+}
+
 const createSchema = z.object({
   motoristaNome: z.string().min(3),
   placaId: z.coerce.number().int(),
@@ -13,9 +22,13 @@ const createSchema = z.object({
   usinaId: z.coerce.number().int(),
   numeroTicket: z.string().min(1),
   toneladas: z.coerce.number().positive(),
-  rodoviaId: z.coerce.number().int(),
-  km: z.coerce.number().nonnegative(),
-  cidade: z.string().min(1),
+  // Localização: rodovia + km (contrato normal) OU logradouro (contrato de
+  // prefeitura). Qual dos dois vale é decidido pelo contrato, na validação cruzada
+  // mais abaixo — nunca pelo que o app enviou.
+  rodoviaId: opcionalDoFormulario(z.coerce.number().int().positive()),
+  km: opcionalDoFormulario(z.coerce.number().nonnegative()),
+  cidade: opcionalDoFormulario(z.string().min(1)),
+  logradouro: opcionalDoFormulario(z.string().min(3)),
   comprimento: z.coerce.number().positive(),
   largura: z.coerce.number().positive(),
   espessura: z.coerce.number().positive(),
@@ -158,7 +171,8 @@ export const registroController = {
       prisma.servico.findUnique({ where: { id: data.servicoId } }),
       prisma.clima.findUnique({ where: { id: data.climaId } }),
       prisma.usina.findUnique({ where: { id: data.usinaId } }),
-      prisma.rodovia.findUnique({ where: { id: data.rodoviaId } }),
+      // Contrato de logradouro não manda rodovia, e findUnique com id undefined lança.
+      data.rodoviaId === undefined ? null : prisma.rodovia.findUnique({ where: { id: data.rodoviaId } }),
     ]);
 
     if (!placa) return res.status(400).json({ message: "Placa inválida." });
@@ -166,7 +180,6 @@ export const registroController = {
     if (!servico) return res.status(400).json({ message: "Serviço inválido." });
     if (!clima) return res.status(400).json({ message: "Clima inválido." });
     if (!usina) return res.status(400).json({ message: "Usina inválida." });
-    if (!rodovia) return res.status(400).json({ message: "Rodovia inválida." });
 
     // Prestador terceirizado só pode usar placa/serviço marcados como de terceiros, e
     // vice-versa — evita registro internos "vazando" pra planilha com dados de placa/
@@ -179,6 +192,29 @@ export const registroController = {
     }
     if (servico.tipo !== tipoEsperadoServico) {
       return res.status(400).json({ message: "Este serviço não está disponível para o seu perfil." });
+    }
+
+    // Contrato de prefeitura ("de logradouro") não tem rodovia nem km: o operador
+    // digita o logradouro e o município vem do cadastro do contrato. Quem manda no
+    // formato é sempre o contrato, nunca o que o app enviou — assim um aplicativo
+    // antigo em cache não consegue gravar um registro meio-rodovia meio-logradouro.
+    const ehLogradouro = contrato.tipoLocal === "logradouro";
+    if (ehLogradouro) {
+      if (!data.logradouro) {
+        return res.status(400).json({
+          message:
+            "Este contrato é de logradouro: informe o logradouro. Se o campo não aparecer, feche o aplicativo por completo e abra de novo para atualizar.",
+        });
+      }
+      if (!contrato.municipio) {
+        return res.status(400).json({
+          message: "Este contrato está marcado como de logradouro mas não tem município cadastrado. Avise o administrador.",
+        });
+      }
+    } else {
+      if (!rodovia) return res.status(400).json({ message: "Rodovia inválida." });
+      if (data.km === undefined) return res.status(400).json({ message: "Informe o km." });
+      if (!data.cidade) return res.status(400).json({ message: "Cidade inválida." });
     }
 
     // Fotos vão para o SharePoint do cliente, em
@@ -261,7 +297,8 @@ export const registroController = {
     // O motorista novo é cadastrado junto com o registro, na mesma transação.
     // Antes ele era criado antes do envio das fotos e ficava sozinho no cadastro
     // quando o envio falhava (foi assim que "Teste Integracao Fotos" apareceu).
-    const registro = await prisma.$transaction(async (tx) => {
+    const criarRegistro = () =>
+      prisma.$transaction(async (tx) => {
       const motoristaId = motorista
         ? motorista.id
         : (
@@ -280,9 +317,11 @@ export const registroController = {
           usinaId: data.usinaId,
           numeroTicket: data.numeroTicket,
           toneladas: data.toneladas,
-          rodoviaId: data.rodoviaId,
-          km: data.km,
-          cidade: data.cidade,
+          rodoviaId: ehLogradouro ? null : data.rodoviaId!,
+          km: ehLogradouro ? null : data.km!,
+          logradouro: ehLogradouro ? data.logradouro! : null,
+          // No contrato de logradouro a cidade não é digitada: é o município do contrato.
+          cidade: ehLogradouro ? contrato.municipio! : data.cidade!,
           comprimento: data.comprimento,
           largura: data.largura,
           espessura: data.espessura,
@@ -305,7 +344,26 @@ export const registroController = {
           usuario: { select: { id: true, nome: true, perfil: true } },
         },
       });
-    });
+      });
+
+    // Quando o celular reenvia o mesmo registro duas vezes ao mesmo tempo (a
+    // sincronização pode disparar por "voltou a internet" e pelo temporizador
+    // juntos), as duas passam pela checagem de clienteId lá em cima antes de
+    // qualquer uma gravar, e o banco recusa a segunda. Isso derrubava o servidor
+    // inteiro. O certo é devolver o registro que a outra acabou de criar.
+    let registro: Awaited<ReturnType<typeof criarRegistro>>;
+    try {
+      registro = await criarRegistro();
+    } catch (err: any) {
+      const duplicado = err?.code === "P2002" && data.clienteId;
+      if (!duplicado) throw err;
+      const existente = await prisma.registro.findUnique({
+        where: { clienteId: data.clienteId },
+        include: { fotos: true },
+      });
+      if (!existente) throw err;
+      return res.status(200).json(existente);
+    }
 
     res.status(201).json(registro);
 

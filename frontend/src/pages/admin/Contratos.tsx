@@ -14,11 +14,26 @@ export function Contratos() {
       endpoint="/contratos"
       searchPlaceholder="Buscar por código ou órgão..."
       matchesSearch={(item, term) => item.codigo.toLowerCase().includes(term) || item.orgao.toLowerCase().includes(term)}
-      emptyItem={{ codigo: "", orgao: "", descricao: "", vigenciaInicio: "", vigenciaFim: "", status: "ativo" }}
+      emptyItem={{
+        codigo: "",
+        orgao: "",
+        descricao: "",
+        tipoLocal: "rodovia",
+        municipio: "",
+        vigenciaInicio: "",
+        vigenciaFim: "",
+        status: "ativo",
+      }}
       columns={[
         { key: "codigo", label: "Código" },
         { key: "orgao", label: "Órgão" },
         { key: "descricao", label: "Descrição" },
+        {
+          key: "tipoLocal",
+          label: "Local",
+          render: (item) =>
+            item.tipoLocal === "logradouro" ? `Logradouro · ${item.municipio ?? "sem município"}` : "Rodovia",
+        },
         {
           key: "vigencia",
           label: "Vigência",
@@ -38,6 +53,16 @@ export function Contratos() {
         { name: "codigo", label: "Código (ex: CT-2024-137)", type: "text", required: true },
         { name: "orgao", label: "Órgão (ex: DER/SC, DNIT)", type: "text", required: true },
         { name: "descricao", label: "Descrição", type: "text", required: true },
+        {
+          name: "tipoLocal",
+          label: "Tipo de local",
+          type: "select",
+          options: [
+            { value: "rodovia", label: "Rodovia — o operador informa rodovia e km" },
+            { value: "logradouro", label: "Logradouro (prefeitura) — o operador digita o endereço" },
+          ],
+        },
+        { name: "municipio", label: "Município (só para contrato de logradouro)", type: "text" },
         { name: "vigenciaInicio", label: "Vigência — início", type: "date", required: true },
         { name: "vigenciaFim", label: "Vigência — fim", type: "date", required: true },
         {

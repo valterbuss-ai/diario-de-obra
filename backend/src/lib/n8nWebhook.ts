@@ -6,7 +6,8 @@ type RegistroCompleto = Registro & {
   servico: Servico;
   clima: Clima;
   usina: Usina;
-  rodovia: Rodovia;
+  // Nulo nos contratos de logradouro (prefeitura), onde não existe rodovia.
+  rodovia: Rodovia | null;
 };
 
 // Payload enviado ao Webhook do fluxo n8n "TESTE - Microsoft Graph SharePoint TES"
@@ -17,9 +18,16 @@ interface RegistroWebhookPayload {
   contrato: string;
   data: string;
   clima: string;
+  /** Coluna E da planilha, que já se chama "RODOVIA / LOGRADOURO". */
   rodovia: string;
   cidade: string;
-  km: number;
+  /**
+   * Colunas G (KM INICIAL) e H (KM FINAL) — o nó do n8n usa este mesmo valor nas
+   * duas, cru, sem Number(). Contrato de logradouro não tem km: vai string vazia,
+   * que o Graph grava como célula em branco. Nunca null, que na gravação de
+   * intervalo pode significar "não altere a célula" e deixaria lixo da linha anterior.
+   */
+  km: number | "";
   lado: string;
   servico: string;
   comprimento: number;
@@ -38,13 +46,17 @@ function requiredEnv(name: string): string {
 }
 
 function montarPayload(registro: RegistroCompleto): RegistroWebhookPayload {
+  // Contrato de prefeitura: o logradouro ocupa a coluna E no lugar da rodovia e as
+  // colunas de km ficam em branco. A coluna já se chama "RODOVIA / LOGRADOURO" na
+  // planilha do cliente, então o fluxo n8n não precisa mudar.
+  const ehLogradouro = registro.contrato.tipoLocal === "logradouro";
   return {
     contrato: registro.contrato.codigo,
     data: registro.data.toISOString().slice(0, 10),
     clima: registro.clima.condicao,
-    rodovia: registro.rodovia.rodovia,
+    rodovia: (ehLogradouro ? registro.logradouro : registro.rodovia?.rodovia) ?? "",
     cidade: registro.cidade,
-    km: Number(registro.km),
+    km: registro.km === null ? "" : Number(registro.km),
     lado: { direito: "Direito", esquerdo: "Esquerdo", ambos: "Ambos" }[registro.lado] ?? registro.lado,
     servico: registro.servico.nome,
     comprimento: Number(registro.comprimento),

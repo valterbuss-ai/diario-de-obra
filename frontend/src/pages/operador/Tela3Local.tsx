@@ -7,7 +7,7 @@ import { SelectField, TextAreaField, TextField } from "../../components/FormFiel
 import { useAuth } from "../../contexts/AuthContext";
 import { useRegistroDraft } from "../../contexts/RegistroContext";
 import { useApiList } from "../../services/hooks";
-import type { Placa, Rodovia, Servico, Usina } from "../../types";
+import type { Contrato, Placa, Rodovia, Servico, Usina } from "../../types";
 
 const FOTOS: { tipo: "antes" | "durante" | "depois" | "trena"; label: string }[] = [
   { tipo: "antes", label: "Antes" },
@@ -30,6 +30,13 @@ export function Tela3Local() {
   const { data: placas } = useApiList<Placa>("/placas");
   const { data: servicos } = useApiList<Servico>(usuario?.perfil === "terceirizado" ? "/servicos-terceiros" : "/servicos");
   const { data: usinas } = useApiList<Usina>("/usinas");
+  // Contrato de prefeitura é executado em rua, não em rodovia: o operador digita o
+  // logradouro e o município já vem do cadastro do contrato. A lista de contratos
+  // já foi buscada na tela 1 e fica guardada no celular, então funciona offline.
+  const { data: contratos } = useApiList<Contrato>("/contratos");
+  const contrato = contratos.find((c) => c.id === draft.contratoId);
+  const ehLogradouro = contrato?.tipoLocal === "logradouro";
+  const municipioDoContrato = contrato?.municipio ?? "";
 
   const placa = placas.find((p) => p.id === draft.placaId)?.placa;
   const servico = servicos.find((s) => s.id === draft.servicoId)?.nome;
@@ -41,6 +48,7 @@ export function Tela3Local() {
   const [cidadeStatus, setCidadeStatus] = useState<"idle" | "buscando" | "encontrada" | "nao-encontrada">("idle");
 
   useEffect(() => {
+    if (ehLogradouro) return; // sem rodovia e sem km, não há cidade a derivar
     const km = Number(draft.km);
     if (!draft.rodoviaNome || !draft.km || Number.isNaN(km)) {
       setCidadeStatus("idle");
@@ -63,13 +71,36 @@ export function Tela3Local() {
       setCidadeStatus("nao-encontrada");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.rodoviaNome, draft.km, rodovias, carregandoRodovias]);
+  }, [ehLogradouro, draft.rodoviaNome, draft.km, rodovias, carregandoRodovias]);
+
+  // Mantém o rascunho coerente com o tipo do contrato: num contrato de prefeitura não
+  // pode sobrar rodovia nem km, e a cidade é sempre o município do contrato; num
+  // contrato normal não pode sobrar logradouro. A comparação antes do updateDraft
+  // evita laço infinito e é o que faz o efeito rodar de novo depois do resetLocal().
+  useEffect(() => {
+    if (ehLogradouro) {
+      if (
+        draft.cidade !== municipioDoContrato ||
+        draft.rodoviaNome !== "" ||
+        draft.km !== "" ||
+        draft.rodoviaId !== ""
+      ) {
+        updateDraft({ cidade: municipioDoContrato, rodoviaNome: "", km: "", rodoviaId: "" });
+      }
+    } else if (draft.logradouro !== "") {
+      updateDraft({ logradouro: "" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ehLogradouro, municipioDoContrato, draft.cidade, draft.rodoviaNome, draft.km, draft.rodoviaId, draft.logradouro]);
 
   const fotosCount = FOTOS.filter((f) => draft.fotos[f.tipo]).length;
 
+  const localPreenchido = ehLogradouro
+    ? draft.logradouro.trim().length >= 3 && draft.cidade !== ""
+    : draft.rodoviaId !== "" && draft.cidade !== "";
+
   const podeFinalizar =
-    draft.rodoviaId !== "" &&
-    draft.cidade !== "" &&
+    localPreenchido &&
     Number(draft.comprimento) > 0 &&
     Number(draft.largura) > 0 &&
     Number(draft.espessura) > 0 &&
@@ -107,49 +138,84 @@ export function Tela3Local() {
         <section className="flex flex-col gap-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Localização</h2>
 
-          <SelectField label="Rodovia" required value={draft.rodoviaNome} onChange={(e) => updateDraft({ rodoviaNome: e.target.value })}>
-            <option value="">Selecione a rodovia</option>
-            {rodoviasOpcoes.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </SelectField>
+          {ehLogradouro ? (
+            <>
+              <TextField
+                label="Logradouro"
+                required
+                placeholder="Ex: Rua Abdon Batista, 450"
+                value={draft.logradouro}
+                onChange={(e) => updateDraft({ logradouro: e.target.value })}
+              />
 
-          <TextField
-            label="Km"
-            required
-            type="number"
-            step="0.1"
-            inputMode="decimal"
-            placeholder="Ex: 62,5"
-            value={draft.km}
-            onChange={(e) => updateDraft({ km: e.target.value })}
-          />
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-gray-300">Município</span>
+                <div
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-base ${
+                    municipioDoContrato ? "border-border bg-surface-alt text-gray-300" : "border-red-500/50 bg-red-500/10 text-red-300"
+                  }`}
+                >
+                  {municipioDoContrato ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-success" />
+                      {municipioDoContrato}
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      Contrato sem município cadastrado — avise o administrador
+                    </>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <SelectField label="Rodovia" required value={draft.rodoviaNome} onChange={(e) => updateDraft({ rodoviaNome: e.target.value })}>
+                <option value="">Selecione a rodovia</option>
+                {rodoviasOpcoes.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </SelectField>
 
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-gray-300">Cidade</span>
-            <div
-              className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-base ${
-                cidadeStatus === "nao-encontrada" ? "border-red-500/50 bg-red-500/10 text-red-300" : "border-border bg-surface-alt text-gray-300"
-              }`}
-            >
-              {cidadeStatus === "buscando" && <span className="text-gray-500">Buscando...</span>}
-              {cidadeStatus === "encontrada" && (
-                <>
-                  <CheckCircle2 className="h-4 w-4 text-success" />
-                  {draft.cidade}
-                </>
-              )}
-              {cidadeStatus === "nao-encontrada" && (
-                <>
-                  <AlertTriangle className="h-4 w-4" />
-                  Trecho não localizado
-                </>
-              )}
-              {cidadeStatus === "idle" && <span className="text-gray-500">Selecione a rodovia e informe o km</span>}
-            </div>
-          </div>
+              <TextField
+                label="Km"
+                required
+                type="number"
+                step="0.1"
+                inputMode="decimal"
+                placeholder="Ex: 62,5"
+                value={draft.km}
+                onChange={(e) => updateDraft({ km: e.target.value })}
+              />
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium text-gray-300">Cidade</span>
+                <div
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-base ${
+                    cidadeStatus === "nao-encontrada" ? "border-red-500/50 bg-red-500/10 text-red-300" : "border-border bg-surface-alt text-gray-300"
+                  }`}
+                >
+                  {cidadeStatus === "buscando" && <span className="text-gray-500">Buscando...</span>}
+                  {cidadeStatus === "encontrada" && (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-success" />
+                      {draft.cidade}
+                    </>
+                  )}
+                  {cidadeStatus === "nao-encontrada" && (
+                    <>
+                      <AlertTriangle className="h-4 w-4" />
+                      Trecho não localizado
+                    </>
+                  )}
+                  {cidadeStatus === "idle" && <span className="text-gray-500">Selecione a rodovia e informe o km</span>}
+                </div>
+              </div>
+            </>
+          )}
         </section>
 
         <section className="flex flex-col gap-5">

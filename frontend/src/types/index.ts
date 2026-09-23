@@ -7,6 +7,7 @@ export type TipoFoto = "antes" | "durante" | "depois" | "trena" | "ticket";
 export type PerfilUsuario = "operador" | "gestor" | "engenheiro" | "terceirizado";
 export type TipoPlaca = "propria" | "terceirizada";
 export type TipoServico = "interno" | "terceirizado";
+export type TipoLocalContrato = "rodovia" | "logradouro";
 
 export interface Usuario {
   id: number;
@@ -37,6 +38,9 @@ export interface Contrato {
   codigo: string;
   orgao: string;
   descricao: string;
+  tipoLocal: TipoLocalContrato;
+  /** Só nos contratos de logradouro; é a cidade de todo registro do contrato. */
+  municipio: string | null;
   vigenciaInicio: string;
   vigenciaFim: string;
   status: StatusContrato;
@@ -93,8 +97,10 @@ export interface Registro {
   usina: Usina;
   numeroTicket: string;
   toneladas: string;
-  rodovia: Rodovia;
-  km: string;
+  // Contrato de rodovia: rodovia + km. Contrato de logradouro (prefeitura): logradouro.
+  rodovia: Rodovia | null;
+  km: string | null;
+  logradouro: string | null;
   cidade: string;
   comprimento: string;
   largura: string;
@@ -105,6 +111,15 @@ export interface Registro {
   fotos: RegistroFoto[];
   usuario: { id: number; nome: string; perfil: PerfilUsuario } | null;
   createdAt: string;
+}
+
+/**
+ * Onde o serviço foi feito: a rodovia, ou o logradouro nos contratos de prefeitura.
+ * Não olha o tipo do contrato de propósito — assim funciona também onde o contrato
+ * não vem junto do registro.
+ */
+export function localDoRegistro(r: Pick<Registro, "logradouro" | "rodovia">) {
+  return r.logradouro ?? r.rodovia?.rodovia ?? "";
 }
 
 export interface DashboardResumo {

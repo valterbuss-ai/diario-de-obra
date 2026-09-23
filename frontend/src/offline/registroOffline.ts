@@ -28,7 +28,10 @@ export function montarRegistroParaEnvio(draft: RegistroDraft, status: "rascunho"
     clienteId,
     usuarioId,
     criadoEm,
-    rodoviaNome: draft.rodoviaNome,
+    // Nome do local só para exibir na lista do dia: a rodovia, ou o logradouro nos
+    // contratos de prefeitura. O campo mantém o nome para não invalidar os itens
+    // já guardados no celular por versões anteriores.
+    rodoviaNome: draft.rodoviaNome || draft.logradouro,
     arquivos,
     campos: {
       clienteId,
@@ -44,6 +47,7 @@ export function montarRegistroParaEnvio(draft: RegistroDraft, status: "rascunho"
       toneladas: draft.toneladas,
       rodoviaId: String(draft.rodoviaId),
       km: draft.km,
+      logradouro: draft.logradouro,
       cidade: draft.cidade,
       comprimento: draft.comprimento,
       largura: draft.largura,

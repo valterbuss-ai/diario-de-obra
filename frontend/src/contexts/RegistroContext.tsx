@@ -17,6 +17,8 @@ export interface RegistroDraft {
   fotoTicket: File | null;
   rodoviaNome: string;
   km: string;
+  /** Contrato de logradouro (prefeitura): substitui rodovia e km. */
+  logradouro: string;
   cidade: string;
   rodoviaId: number | "";
   comprimento: string;
@@ -44,6 +46,7 @@ export const emptyDraft: RegistroDraft = {
   fotoTicket: null,
   rodoviaNome: "",
   km: "",
+  logradouro: "",
   cidade: "",
   rodoviaId: "",
   comprimento: "",
@@ -113,6 +116,7 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
       ...prev,
       rodoviaNome: emptyDraft.rodoviaNome,
       km: emptyDraft.km,
+      logradouro: emptyDraft.logradouro,
       cidade: emptyDraft.cidade,
       rodoviaId: emptyDraft.rodoviaId,
       comprimento: emptyDraft.comprimento,

@@ -18,7 +18,7 @@ export function Login() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
-      const logged = await login(email, senha);
+      const logged = await login(email.trim(), senha);
       if (logged.perfil === "operador" || logged.perfil === "terceirizado") navigate("/operador/equipe");
       else if (logged.perfil === "gestor") navigate("/admin");
       else navigate("/engenheiro");
@@ -45,6 +45,10 @@ export function Login() {
             <input
               type="email"
               required
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="voce@obra.com"

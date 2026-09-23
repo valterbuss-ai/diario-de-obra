@@ -7,6 +7,8 @@ interface AuthContextValue {
   usuario: Usuario | null;
   loading: boolean;
   error: string | null;
+  /** Detalhe técnico da última falha de login (status HTTP), para diagnosticar. */
+  diagnostico: string | null;
   login: (email: string, senha: string) => Promise<Usuario>;
   logout: () => void;
 }
@@ -27,10 +29,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(readStoredUsuario);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [diagnostico, setDiagnostico] = useState<string | null>(null);
 
   async function login(email: string, senha: string) {
     setLoading(true);
     setError(null);
+    setDiagnostico(null);
     try {
       const { data } = await api.post("/auth/login", { email, senha });
       localStorage.setItem("diario:token", data.token);
@@ -38,7 +42,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUsuario(data.usuario);
       return data.usuario as Usuario;
     } catch (err: any) {
-      const message = err.response?.data?.message ?? "Não foi possível entrar. Tente novamente.";
+      // Sem resposta = o servidor não foi alcançado (sem internet, ou o servidor gratuito
+      // ainda acordando, o que leva até 1 minuto). É diferente de senha errada.
+      const semResposta = !err.response;
+      const message = semResposta
+        ? "Não consegui falar com o servidor. Ele pode estar iniciando: aguarde 1 minuto e tente de novo."
+        : (err.response.data?.message ?? "Não foi possível entrar. Tente novamente.");
+      setDiagnostico(semResposta ? `sem resposta do servidor (${err.code ?? err.message})` : `servidor respondeu ${err.response.status}`);
       setError(message);
       throw new Error(message);
     } finally {
@@ -53,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ usuario, loading, error, login, logout }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={{ usuario, loading, error, diagnostico, login, logout }}>{children}</AuthContext.Provider>
   );
 }
 

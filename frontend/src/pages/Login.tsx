@@ -1,4 +1,4 @@
-import { HardHat, LogIn } from "lucide-react";
+import { Eye, EyeOff, HardHat, LogIn } from "lucide-react";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -6,9 +6,10 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
 
 export function Login() {
-  const { usuario, login, loading, error } = useAuth();
+  const { usuario, login, loading, error, diagnostico } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const navigate = useNavigate();
 
   if (usuario) {
@@ -57,17 +58,41 @@ export function Login() {
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium text-gray-300">Senha</span>
-            <input
-              type="password"
-              required
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-lg border border-border bg-surface-alt px-4 py-3 text-white placeholder:text-gray-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
+            <div className="relative">
+              <input
+                type={mostrarSenha ? "text" : "password"}
+                required
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-lg border border-border bg-surface-alt py-3 pl-4 pr-12 text-white placeholder:text-gray-500 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {/* Deixa conferir o que está sendo enviado (ex: senha antiga preenchida sozinha). */}
+              <button
+                type="button"
+                onClick={() => setMostrarSenha((v) => !v)}
+                className="absolute inset-y-0 right-0 flex items-center px-4 text-gray-400 hover:text-primary"
+                aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}
+              >
+                {mostrarSenha ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
           </label>
 
-          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
+          {error && (
+            <div className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              <p>{error}</p>
+              {diagnostico && (
+                <p className="mt-1 text-xs text-red-300/80">
+                  Detalhe: {diagnostico} · e-mail enviado: "{email.trim()}" · senha com {senha.length} caractere(s)
+                </p>
+              )}
+            </div>
+          )}
 
           <button
             type="submit"

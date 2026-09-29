@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, CloudOff, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, CloudOff, ImageDown, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
@@ -26,7 +26,9 @@ export function RegistrosDoDia() {
   const [enviarErro, setEnviarErro] = useState<string | null>(null);
   const [enviados, setEnviados] = useState<number | null>(null);
 
-  const salvoNoCelular = (location.state as { salvoNoCelular?: boolean } | null)?.salvoNoCelular === true;
+  const estado = location.state as { salvoNoCelular?: boolean; fotosReduzidas?: boolean } | null;
+  const salvoNoCelular = estado?.salvoNoCelular === true;
+  const fotosReduzidas = estado?.fotosReduzidas === true;
   const total = pendentes.length + fila.length;
 
   function novoRegistro() {
@@ -65,6 +67,15 @@ export function RegistrosDoDia() {
           <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-primary">
             <CloudOff className="mt-0.5 h-5 w-5 shrink-0" />
             <p className="text-sm font-medium">Sem internet: o registro foi guardado no celular e será enviado sozinho quando o sinal voltar.</p>
+          </div>
+        )}
+
+        {fotosReduzidas && (
+          <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-primary">
+            <ImageDown className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">
+              As fotos foram reduzidas para caber no celular. O registro está salvo e será enviado normalmente.
+            </p>
           </div>
         )}
 

@@ -1,6 +1,6 @@
 ﻿import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { enviarRegistro, montarRegistroParaEnvio } from "../offline/registroOffline";
+import { comFotosReduzidas, enviarRegistro, montarRegistroParaEnvio } from "../offline/registroOffline";
 import { useAuth } from "./AuthContext";
 import { useSincronizacao } from "./SincronizacaoContext";
 import type { LadoPista } from "../types";
@@ -81,7 +81,7 @@ interface RegistroContextValue {
   submitting: boolean;
   submitError: string | null;
   /** Salva no servidor; sem internet, guarda no celular (offline: true). */
-  submitDraft: (status?: "rascunho" | "enviado") => Promise<{ offline: boolean }>;
+  submitDraft: (status?: "rascunho" | "enviado") => Promise<{ offline: boolean; fotosReduzidas: boolean }>;
 }
 
 const RegistroContext = createContext<RegistroContextValue | undefined>(undefined);
@@ -131,15 +131,15 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   async function submitDraft(status: "rascunho" | "enviado" = "rascunho") {
     setSubmitting(true);
     setSubmitError(null);
-    const item = montarRegistroParaEnvio(draft, status, usuario?.id ?? 0);
     try {
+      const item = await montarRegistroParaEnvio(draft, status, usuario?.id ?? 0);
       if (navigator.onLine) {
         try {
           // Com sinal fraco não deixa o operador esperando: se passar do tempo,
           // guarda no celular. Se o envio tiver chegado mesmo assim, o reenvio
           // usa o mesmo id e o servidor não duplica.
           await enviarRegistro(item, 30_000);
-          return { offline: false };
+          return { offline: false, fotosReduzidas: false };
         } catch (err: any) {
           if (err.response) {
             const message = err.response.data?.message ?? "Não foi possível salvar o registro. Tente novamente.";
@@ -149,14 +149,26 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Guardar no celular é a última linha de defesa do trabalho feito em campo.
+      // Se a foto no tamanho original não couber, tenta de novo com as fotos
+      // reduzidas em vez de deixar o operador perder o registro.
       try {
         await adicionarNaFila(item);
-      } catch {
-        const message = "Sem internet e não foi possível guardar o registro no celular. Não feche o app e tente de novo.";
-        setSubmitError(message);
-        throw new Error(message);
+        return { offline: true, fotosReduzidas: false };
+      } catch (erroOriginal: any) {
+        try {
+          await adicionarNaFila(await comFotosReduzidas(item));
+          return { offline: true, fotosReduzidas: true };
+        } catch (erroReduzido: any) {
+          // O motivo vai na tela: sem ele, a falha anterior levou a investigar no escuro.
+          const motivo = erroReduzido?.name === "QuotaExceededError" || erroOriginal?.name === "QuotaExceededError"
+            ? "o celular está sem espaço."
+            : `motivo: ${erroReduzido?.message ?? erroOriginal?.message ?? "desconhecido"}`;
+          const message = `Não foi possível guardar o registro no celular — ${motivo} Não feche o app: libere espaço e toque em salvar de novo.`;
+          setSubmitError(message);
+          throw new Error(message);
+        }
       }
-      return { offline: true };
     } finally {
       setSubmitting(false);
     }

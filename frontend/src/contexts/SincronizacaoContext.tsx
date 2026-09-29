@@ -25,7 +25,10 @@ interface SincronizacaoContextValue {
 
 const SincronizacaoContext = createContext<SincronizacaoContextValue | undefined>(undefined);
 
-const TIMEOUT_ENVIO_FILA_MS = 120_000;
+// O envio em segundo plano carrega as fotos no tamanho original, e com sinal fraco
+// de estrada isso não termina em dois minutos. O operador não fica esperando: é o
+// app que tenta sozinho, então vale dar tempo em vez de desistir e tentar de novo.
+const TIMEOUT_ENVIO_FILA_MS = 300_000;
 
 const chaveEnvioAgendado = (usuarioId: number) => `diario:enviar-apos-sincronizar:${usuarioId}`;
 

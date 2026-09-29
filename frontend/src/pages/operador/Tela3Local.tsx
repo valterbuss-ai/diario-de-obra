@@ -109,10 +109,10 @@ export function Tela3Local() {
 
   async function handleSalvar() {
     try {
-      const { offline } = await submitDraft("rascunho");
+      const { offline, fotosReduzidas } = await submitDraft("rascunho");
       // Equipe e carga ficam para o próximo registro; só a etapa 3 é limpa.
       resetLocal();
-      navigate("/operador/dia", { state: { salvoNoCelular: offline } });
+      navigate("/operador/dia", { state: { salvoNoCelular: offline, fotosReduzidas } });
     } catch {
       // erro exposto via contexto (submitError)
     }

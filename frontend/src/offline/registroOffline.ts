@@ -1,4 +1,5 @@
 import type { RegistroDraft } from "../contexts/RegistroContext";
+import { copiaSegura, nomeDaFoto, reduzir } from "./fotos";
 import { api } from "../services/api";
 import type { Registro } from "../types";
 import type { CampoArquivo, RegistroNaFila } from "./filaDb";
@@ -13,15 +14,22 @@ function gerarClienteId(): string {
 }
 
 /** Monta o registro com id e horário próprios, pronto para enviar agora ou guardar na fila. */
-export function montarRegistroParaEnvio(draft: RegistroDraft, status: "rascunho" | "enviado", usuarioId: number): RegistroNaFila {
+export async function montarRegistroParaEnvio(
+  draft: RegistroDraft,
+  status: "rascunho" | "enviado",
+  usuarioId: number
+): Promise<RegistroNaFila> {
   const clienteId = gerarClienteId();
   const criadoEm = new Date().toISOString();
 
+  // Cópia própria de cada foto: o File da câmera é só uma referência a um arquivo
+  // temporário, e guardar essa referência falhava quando a câmera já a tinha
+  // liberado. A imagem não é alterada — a qualidade continua sendo a original.
   const arquivos: Partial<Record<CampoArquivo, Blob>> = {};
-  if (draft.fotoTicket) arquivos.fotoTicket = draft.fotoTicket;
+  if (draft.fotoTicket) arquivos.fotoTicket = await copiaSegura(draft.fotoTicket);
   for (const tipo of ["antes", "durante", "depois", "trena"] as const) {
     const foto = draft.fotos[tipo];
-    if (foto) arquivos[tipo] = foto;
+    if (foto) arquivos[tipo] = await copiaSegura(foto);
   }
 
   return {
@@ -63,11 +71,24 @@ export function enviarRegistro(item: RegistroNaFila, timeoutMs: number) {
   for (const [campo, valor] of Object.entries(item.campos)) form.append(campo, valor);
   for (const [campo, arquivo] of Object.entries(item.arquivos)) {
     if (!arquivo) continue;
-    // O nome original mantém a extensão da foto no servidor.
-    form.append(campo, arquivo, arquivo instanceof File ? arquivo.name : `${campo}.jpg`);
+    // O servidor tira a extensão do nome do arquivo, então ela vem do tipo da imagem.
+    form.append(campo, arquivo, nomeDaFoto(campo, arquivo));
   }
   return api.post<Registro>("/registros", form, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: timeoutMs,
   });
+}
+
+/**
+ * Mesmo registro, com as fotos reduzidas. Usado só quando o celular não conseguiu
+ * guardar as fotos no tamanho original — perder um pouco de qualidade é melhor do
+ * que perder o registro que o operador acabou de fazer em campo.
+ */
+export async function comFotosReduzidas(item: RegistroNaFila): Promise<RegistroNaFila> {
+  const arquivos: Partial<Record<CampoArquivo, Blob>> = {};
+  for (const [campo, foto] of Object.entries(item.arquivos)) {
+    if (foto) arquivos[campo as CampoArquivo] = await reduzir(foto);
+  }
+  return { ...item, arquivos };
 }

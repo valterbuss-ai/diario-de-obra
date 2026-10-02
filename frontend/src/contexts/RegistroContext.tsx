@@ -131,6 +131,14 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   async function submitDraft(status: "rascunho" | "enviado" = "rascunho") {
     setSubmitting(true);
     setSubmitError(null);
+    // Toda falha precisa virar mensagem na tela. Sem isto, um erro ao preparar as
+    // fotos saía sem aviso nenhum e o operador só via o nada acontecer.
+    let jaAvisou = false;
+    const avisar = (texto: string) => {
+      jaAvisou = true;
+      setSubmitError(texto);
+      return new Error(texto);
+    };
     try {
       const item = await montarRegistroParaEnvio(draft, status, usuario?.id ?? 0);
       if (navigator.onLine) {
@@ -142,9 +150,7 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
           return { offline: false, fotosReduzidas: false };
         } catch (err: any) {
           if (err.response) {
-            const message = err.response.data?.message ?? "Não foi possível salvar o registro. Tente novamente.";
-            setSubmitError(message);
-            throw new Error(message);
+            throw avisar(err.response.data?.message ?? "Não foi possível salvar o registro. Tente novamente.");
           }
         }
       }
@@ -164,11 +170,16 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
           const motivo = erroReduzido?.name === "QuotaExceededError" || erroOriginal?.name === "QuotaExceededError"
             ? "o celular está sem espaço."
             : `motivo: ${erroReduzido?.message ?? erroOriginal?.message ?? "desconhecido"}`;
-          const message = `Não foi possível guardar o registro no celular — ${motivo} Não feche o app: libere espaço e toque em salvar de novo.`;
-          setSubmitError(message);
-          throw new Error(message);
+          throw avisar(`Não foi possível guardar o registro no celular — ${motivo} Não feche o app: libere espaço e toque em salvar de novo.`);
         }
       }
+    } catch (err: any) {
+      // Rede de segurança: qualquer falha não prevista (por exemplo ao ler a foto
+      // da câmera) também precisa aparecer, com o motivo técnico junto.
+      if (!jaAvisou) {
+        setSubmitError(`Não foi possível salvar o registro. Motivo: ${err?.message ?? err}. Não feche o app e tente de novo.`);
+      }
+      throw err;
     } finally {
       setSubmitting(false);
     }

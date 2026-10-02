@@ -1,5 +1,5 @@
 import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { PhotoSlot } from "../../components/PhotoSlot";
@@ -46,6 +46,10 @@ export function Tela3Local() {
     .join(" · ");
 
   const [cidadeStatus, setCidadeStatus] = useState<"idle" | "buscando" | "encontrada" | "nao-encontrada">("idle");
+  // Última cidade que veio do cadastro de trechos. Serve para nunca apagar uma cidade
+  // que o operador digitou: o efeito abaixo roda de novo quando a lista de rodovias
+  // recarrega, e sem isso o que ele escreveu sumiria da tela.
+  const cidadeDoCadastro = useRef<string | null>(null);
 
   useEffect(() => {
     if (ehLogradouro) return; // sem rodovia e sem km, não há cidade a derivar
@@ -53,6 +57,7 @@ export function Tela3Local() {
     if (!draft.rodoviaNome || !draft.km || Number.isNaN(km)) {
       setCidadeStatus("idle");
       updateDraft({ cidade: "", rodoviaId: "" });
+      cidadeDoCadastro.current = null;
       return;
     }
 
@@ -65,11 +70,23 @@ export function Tela3Local() {
     const trecho = rodovias.find((r) => r.rodovia === draft.rodoviaNome && Number(r.kmInicio) <= km && Number(r.kmFim) >= km);
     if (trecho) {
       updateDraft({ cidade: trecho.cidade, rodoviaId: trecho.id });
+      cidadeDoCadastro.current = trecho.cidade;
       setCidadeStatus("encontrada");
-    } else {
-      updateDraft({ cidade: "", rodoviaId: "" });
-      setCidadeStatus("nao-encontrada");
+      return;
     }
+
+    // Km fora de qualquer trecho cadastrado (há trechos registrados como "km 0 a 0",
+    // e sempre haverá km ainda não cadastrado). Antes isso travava o botão de salvar
+    // e o operador perdia em campo o trabalho já feito. Agora o registro segue: fica
+    // a rodovia que ele escolheu e ele mesmo informa a cidade.
+    const qualquerTrechoDaRodovia = rodovias.find((r) => r.rodovia === draft.rodoviaNome);
+    const limpar = draft.cidade === cidadeDoCadastro.current; // nunca apaga o que ele digitou
+    updateDraft({
+      ...(limpar ? { cidade: "" } : {}),
+      rodoviaId: qualquerTrechoDaRodovia ? qualquerTrechoDaRodovia.id : "",
+    });
+    cidadeDoCadastro.current = null;
+    setCidadeStatus("nao-encontrada");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ehLogradouro, draft.rodoviaNome, draft.km, rodovias, carregandoRodovias]);
 
@@ -95,9 +112,11 @@ export function Tela3Local() {
 
   const fotosCount = FOTOS.filter((f) => draft.fotos[f.tipo]).length;
 
+  // A cidade pode vir do cadastro de trechos ou ser digitada pelo operador quando o
+  // km não está em nenhum trecho — o que importa é ela estar preenchida.
   const localPreenchido = ehLogradouro
     ? draft.logradouro.trim().length >= 3 && draft.cidade !== ""
-    : draft.rodoviaId !== "" && draft.cidade !== "";
+    : draft.rodoviaId !== "" && draft.cidade.trim() !== "";
 
   const podeFinalizar =
     localPreenchido &&
@@ -106,6 +125,23 @@ export function Tela3Local() {
     Number(draft.espessura) > 0 &&
     draft.lado !== "" &&
     !submitting;
+
+  // Botão apagado sem explicação faz o operador achar que o app travou. Aqui ele
+  // vê exatamente o que falta preencher.
+  const faltando = [
+    !localPreenchido &&
+      (ehLogradouro
+        ? municipioDoContrato
+          ? "o logradouro"
+          : "o município do contrato (avise o administrador)"
+        : draft.rodoviaId === ""
+        ? "a rodovia e o km"
+        : "a cidade"),
+    !(Number(draft.comprimento) > 0) && "comprimento",
+    !(Number(draft.largura) > 0) && "largura",
+    !(Number(draft.espessura) > 0) && "espessura",
+    draft.lado === "" && "lado da pista",
+  ].filter(Boolean) as string[];
 
   async function handleSalvar() {
     try {
@@ -208,11 +244,25 @@ export function Tela3Local() {
                   {cidadeStatus === "nao-encontrada" && (
                     <>
                       <AlertTriangle className="h-4 w-4" />
-                      Trecho não localizado
+                      Trecho não cadastrado para este km
                     </>
                   )}
                   {cidadeStatus === "idle" && <span className="text-gray-500">Selecione a rodovia e informe o km</span>}
                 </div>
+
+                {cidadeStatus === "nao-encontrada" && (
+                  <div className="mt-2">
+                    {/* O registro não pode ficar preso por causa de um trecho que ainda
+                        não foi cadastrado: o operador informa a cidade e segue. */}
+                    <TextField
+                      label="Cidade"
+                      required
+                      placeholder="Informe a cidade do serviço"
+                      value={draft.cidade}
+                      onChange={(e) => updateDraft({ cidade: e.target.value })}
+                    />
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -277,6 +327,12 @@ export function Tela3Local() {
         </section>
 
         {submitError && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{submitError}</p>}
+
+        {!submitError && faltando.length > 0 && (
+          <p className="rounded-lg bg-primary/10 px-3 py-2 text-sm text-primary">
+            Para salvar, falta preencher: {faltando.join(", ")}.
+          </p>
+        )}
 
         <div className="flex gap-3">
           <button

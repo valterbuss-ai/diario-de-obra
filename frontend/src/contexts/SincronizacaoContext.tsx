@@ -30,6 +30,9 @@ const SincronizacaoContext = createContext<SincronizacaoContextValue | undefined
 // app que tenta sozinho, então vale dar tempo em vez de desistir e tentar de novo.
 const TIMEOUT_ENVIO_FILA_MS = 300_000;
 
+/** A partir daqui o operador passa a ver o aviso de que um registro não está subindo. */
+const TENTATIVAS_ATE_AVISAR = 3;
+
 const chaveEnvioAgendado = (usuarioId: number) => `diario:enviar-apos-sincronizar:${usuarioId}`;
 
 function lerEnvioAgendado(usuarioId: number) {
@@ -92,20 +95,43 @@ export function SincronizacaoProvider({ children }: { children: ReactNode }) {
       let semConexao = false;
       let enviouAlgum = false;
 
-      // Um de cada vez, na ordem em que foram salvos.
-      for (const item of itens) {
+      // Um de cada vez. Os que menos falharam vão primeiro: antes, um registro que
+      // não subia travava a fila inteira (o laço parava nele e recomeçava do mesmo
+      // ponto a cada minuto), e os seguintes nunca chegavam a ser tentados.
+      const naOrdem = [...itens].sort(
+        (a, b) => (a.tentativas ?? 0) - (b.tentativas ?? 0) || a.criadoEm.localeCompare(b.criadoEm)
+      );
+
+      for (const item of naOrdem) {
         try {
           await enviarRegistro(item, TIMEOUT_ENVIO_FILA_MS);
           await removerDaFila(item.clienteId);
           enviouAlgum = true;
         } catch (err: any) {
-          // Sem resposta (sem sinal) ou login expirado: para e tenta de novo depois.
-          if (!err.response || err.response.status === 401) {
+          // Sem sinal de verdade, ou login expirado: insistir nos outros não adianta.
+          if (!navigator.onLine || err.response?.status === 401) {
             semConexao = true;
             break;
           }
-          // O servidor recusou (ex: cadastro excluído): fica guardado com o motivo.
-          await salvarNaFila({ ...item, erro: err.response.data?.message ?? "O servidor recusou este registro." });
+
+          if (err.response) {
+            // O servidor recusou (ex: cadastro excluído): fica guardado com o motivo.
+            await salvarNaFila({ ...item, erro: err.response.data?.message ?? "O servidor recusou este registro." });
+            continue;
+          }
+
+          // Não houve resposta (demorou demais) mas há sinal: conta a tentativa e
+          // segue para o próximo, em vez de deixar este bloquear todos os outros.
+          const tentativas = (item.tentativas ?? 0) + 1;
+          semConexao = true;
+          await salvarNaFila({
+            ...item,
+            tentativas,
+            erro:
+              tentativas >= TENTATIVAS_ATE_AVISAR
+                ? `Não foi possível enviar depois de ${tentativas} tentativas. O app continua tentando; se persistir, avise o responsável.`
+                : item.erro,
+          });
         }
       }
 

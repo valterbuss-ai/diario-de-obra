@@ -13,6 +13,9 @@ export interface RegistroNaFila {
   rodoviaNome: string;
   /** Motivo quando o servidor recusou o registro (não é falta de internet). */
   erro?: string;
+  /** Quantas vezes o envio deste registro já falhou. Os que menos falharam vão
+   *  primeiro, para que um registro problemático não impeça os outros de subir. */
+  tentativas?: number;
 }
 
 const DB_NAME = "diario-de-obra-offline";

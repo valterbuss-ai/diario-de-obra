@@ -298,7 +298,8 @@ export const registroController = {
     // Antes ele era criado antes do envio das fotos e ficava sozinho no cadastro
     // quando o envio falhava (foi assim que "Teste Integracao Fotos" apareceu).
     const criarRegistro = () =>
-      prisma.$transaction(async (tx) => {
+      prisma.$transaction(
+        async (tx) => {
       const motoristaId = motorista
         ? motorista.id
         : (
@@ -344,7 +345,12 @@ export const registroController = {
           usuario: { select: { id: true, nome: true, perfil: true } },
         },
       });
-      });
+        },
+        // O padrão do Prisma é 5 segundos, e com o banco sob carga (vários registros
+        // da fila chegando juntos) isso estourava. O erro não era tratado e derrubava
+        // o servidor, deixando o celular sem resposta e a fila presa para sempre.
+        { timeout: 30_000, maxWait: 15_000 }
+      );
 
     // Quando o celular reenvia o mesmo registro duas vezes ao mesmo tempo (a
     // sincronização pode disparar por "voltou a internet" e pelo temporizador

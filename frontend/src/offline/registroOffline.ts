@@ -32,6 +32,16 @@ export async function montarRegistroParaEnvio(
     if (foto) arquivos[tipo] = await copiaSegura(foto);
   }
 
+  // O número da rua é guardado no campo km, como o engenheiro pediu. Número de
+  // endereço nem sempre é um número ("s/n", "450A"): nesse caso ele é juntado ao
+  // nome da rua, para não se perder, e o km fica vazio. Assim o operador nunca é
+  // impedido de salvar por causa do formato do endereço.
+  const numero = draft.numeroLogradouro.trim();
+  const numeroEhNumerico = numero !== "" && /^\d+$/.test(numero);
+  const logradouroParaEnviar =
+    numero === "" || numeroEhNumerico ? draft.logradouro : `${draft.logradouro}, ${numero}`;
+  const kmParaEnviar = draft.logradouro ? (numeroEhNumerico ? numero : "") : draft.km;
+
   return {
     clienteId,
     usuarioId,
@@ -54,8 +64,8 @@ export async function montarRegistroParaEnvio(
       numeroTicket: draft.numeroTicket,
       toneladas: draft.toneladas,
       rodoviaId: String(draft.rodoviaId),
-      km: draft.km,
-      logradouro: draft.logradouro,
+      km: kmParaEnviar,
+      logradouro: logradouroParaEnviar,
       cidade: draft.cidade,
       comprimento: draft.comprimento,
       largura: draft.largura,

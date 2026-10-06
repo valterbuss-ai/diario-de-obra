@@ -104,18 +104,27 @@ export function Tela3Local() {
       ) {
         updateDraft({ cidade: municipioDoContrato, rodoviaNome: "", km: "", rodoviaId: "" });
       }
-    } else if (draft.logradouro !== "") {
-      updateDraft({ logradouro: "" });
+    } else if (draft.logradouro !== "" || draft.numeroLogradouro !== "") {
+      updateDraft({ logradouro: "", numeroLogradouro: "" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ehLogradouro, municipioDoContrato, draft.cidade, draft.rodoviaNome, draft.km, draft.rodoviaId, draft.logradouro]);
+  }, [
+    ehLogradouro,
+    municipioDoContrato,
+    draft.cidade,
+    draft.rodoviaNome,
+    draft.km,
+    draft.rodoviaId,
+    draft.logradouro,
+    draft.numeroLogradouro,
+  ]);
 
   const fotosCount = FOTOS.filter((f) => draft.fotos[f.tipo]).length;
 
   // A cidade pode vir do cadastro de trechos ou ser digitada pelo operador quando o
   // km não está em nenhum trecho — o que importa é ela estar preenchida.
   const localPreenchido = ehLogradouro
-    ? draft.logradouro.trim().length >= 3 && draft.cidade !== ""
+    ? draft.logradouro.trim().length >= 3 && draft.numeroLogradouro.trim() !== "" && draft.cidade !== ""
     : draft.rodoviaId !== "" && draft.cidade.trim() !== "";
 
   const podeFinalizar =
@@ -131,9 +140,11 @@ export function Tela3Local() {
   const faltando = [
     !localPreenchido &&
       (ehLogradouro
-        ? municipioDoContrato
-          ? "o logradouro"
-          : "o município do contrato (avise o administrador)"
+        ? !municipioDoContrato
+          ? "o município do contrato (avise o administrador)"
+          : draft.logradouro.trim().length < 3
+          ? "o nome da rua"
+          : "o número"
         : draft.rodoviaId === ""
         ? "a rodovia e o km"
         : "a cidade"),
@@ -177,11 +188,23 @@ export function Tela3Local() {
           {ehLogradouro ? (
             <>
               <TextField
-                label="Logradouro"
+                label="Rua"
                 required
-                placeholder="Ex: Rua Abdon Batista, 450"
+                placeholder="Ex: Rua Abdon Batista"
                 value={draft.logradouro}
                 onChange={(e) => updateDraft({ logradouro: e.target.value })}
+              />
+
+              {/* O número vai para o campo km, como o engenheiro pediu. Aceita texto
+                  porque endereço nem sempre tem número ("s/n", "450A") — e o operador
+                  não pode ficar impedido de salvar por causa disso. */}
+              <TextField
+                label="Número"
+                required
+                inputMode="numeric"
+                placeholder="Ex: 450 (ou s/n)"
+                value={draft.numeroLogradouro}
+                onChange={(e) => updateDraft({ numeroLogradouro: e.target.value })}
               />
 
               <div className="flex flex-col gap-1.5">

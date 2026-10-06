@@ -319,7 +319,10 @@ export const registroController = {
           numeroTicket: data.numeroTicket,
           toneladas: data.toneladas,
           rodoviaId: ehLogradouro ? null : data.rodoviaId!,
-          km: ehLogradouro ? null : data.km!,
+          // No contrato de logradouro o km guarda o número da rua, quando ele é um
+          // número. Endereços como "s/n" ou "450A" chegam junto do nome da rua e o
+          // km fica vazio (ver montarRegistroParaEnvio no app).
+          km: ehLogradouro ? data.km ?? null : data.km!,
           logradouro: ehLogradouro ? data.logradouro! : null,
           // No contrato de logradouro a cidade não é digitada: é o município do contrato.
           cidade: ehLogradouro ? contrato.municipio! : data.cidade!,

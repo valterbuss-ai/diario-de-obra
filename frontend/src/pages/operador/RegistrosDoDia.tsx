@@ -114,9 +114,13 @@ export function RegistrosDoDia() {
                     <p className="font-semibold text-white">{servico}</p>
                     <span className="text-xs text-gray-500">{dataHoraPtBr(item.criadoEm)}</span>
                   </div>
-                  {/* O km some nos contratos de logradouro, onde não existe. */}
+                  {/* Nos contratos de logradouro o campo km guarda o número da rua. */}
                   <p className="mt-1 text-sm text-gray-400">
-                    {[item.rodoviaNome, item.campos.km && `km ${item.campos.km}`, item.campos.cidade]
+                    {[
+                      item.rodoviaNome,
+                      item.campos.km && (item.campos.logradouro ? `nº ${item.campos.km}` : `km ${item.campos.km}`),
+                      item.campos.cidade,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
@@ -153,7 +157,9 @@ export function RegistrosDoDia() {
                   <span className="text-xs text-gray-500">{dataHoraPtBr(r.createdAt)}</span>
                 </div>
                 <p className="mt-1 text-sm text-gray-400">
-                  {[localDoRegistro(r), r.km && `km ${r.km}`, r.cidade].filter(Boolean).join(" · ")}
+                  {[localDoRegistro(r), r.km && (r.logradouro ? `nº ${r.km}` : `km ${r.km}`), r.cidade]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
                 <p className="text-sm text-gray-500">
                   {r.motorista.nome} · {r.placa.placa}

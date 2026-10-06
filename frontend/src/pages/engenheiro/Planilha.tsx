@@ -12,6 +12,15 @@ function numeroPtBr(value: string, digits = 1) {
   return Number(value).toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
+/**
+ * Coluna "Km / Nº": nos contratos de rodovia é o km (62,5); nos de logradouro o
+ * mesmo campo guarda o número da rua, que é inteiro e não leva casa decimal.
+ */
+function kmOuNumero(r: Registro) {
+  if (!r.km) return "";
+  return r.logradouro ? String(Number(r.km)) : numeroPtBr(r.km);
+}
+
 function dataPtBr(value: string) {
   return new Date(value).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
@@ -45,7 +54,7 @@ export function Planilha() {
       "Ton.": numeroPtBr(r.toneladas),
       Contrato: r.contrato.codigo,
       "Rodovia / Logradouro": localDoRegistro(r),
-      Km: r.km ? numeroPtBr(r.km) : "",
+      "Km / Nº": kmOuNumero(r),
       Cidade: r.cidade,
       "C×L×E": `${numeroPtBr(r.comprimento)}×${numeroPtBr(r.largura)}×${numeroPtBr(r.espessura, 2)}`,
       Lado: { direito: "Direito", esquerdo: "Esquerdo", ambos: "Ambos" }[r.lado] ?? r.lado,
@@ -93,7 +102,7 @@ export function Planilha() {
           <table className="w-full whitespace-nowrap text-left text-sm">
             <thead>
               <tr className="border-b border-border text-gray-400">
-                {["Data", "Origem", "Motorista", "Placa", "Serviço", "Clima", "Usina", "Ticket", "Ton.", "Contrato", "Rodovia / Logradouro", "Km", "Cidade", "C×L×E", "Lado", "Fotos"].map(
+                {["Data", "Origem", "Motorista", "Placa", "Serviço", "Clima", "Usina", "Ticket", "Ton.", "Contrato", "Rodovia / Logradouro", "Km / Nº", "Cidade", "C×L×E", "Lado", "Fotos"].map(
                   (h) => (
                     <th key={h} className="px-4 py-3 font-medium">
                       {h}
@@ -178,7 +187,7 @@ export function Planilha() {
                       <td className="px-4 py-3 text-gray-200">{numeroPtBr(r.toneladas)} t</td>
                       <td className="px-4 py-3 text-gray-200">{r.contrato.codigo}</td>
                       <td className="px-4 py-3 text-gray-200">{localDoRegistro(r)}</td>
-                      <td className="px-4 py-3 text-gray-200">{r.km ? numeroPtBr(r.km) : "—"}</td>
+                      <td className="px-4 py-3 text-gray-200">{kmOuNumero(r) || "—"}</td>
                       <td className="px-4 py-3 text-gray-200">{r.cidade}</td>
                       <td className="px-4 py-3 text-gray-200">
                         {numeroPtBr(r.comprimento)}×{numeroPtBr(r.largura)}×{numeroPtBr(r.espessura, 2)}

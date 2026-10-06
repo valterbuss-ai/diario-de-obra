@@ -177,6 +177,25 @@ export async function renomearItem(driveId: string, itemId: string, novoNome: st
   if (!res.ok) throw new Error(`Erro ao renomear para "${novoNome}" (${res.status}): ${await res.text()}`);
 }
 
+/**
+ * Troca o conteúdo de uma foto que já está arquivada, mantendo o mesmo arquivo.
+ * É assim que a edição de um registro substitui uma foto sem desarrumar a
+ * numeração mensal do engenheiro: o número já dado àquele arquivo é preservado.
+ */
+export async function substituirConteudoDaFoto(
+  driveId: string,
+  itemId: string,
+  conteudo: Buffer,
+  contentType: string
+): Promise<void> {
+  const res = await graphFetch(`/drives/${driveId}/items/${itemId}/content`, {
+    method: "PUT",
+    headers: { "Content-Type": contentType },
+    body: new Uint8Array(conteudo),
+  });
+  if (!res.ok) throw new Error(`Erro ao substituir a foto (${res.status}): ${await res.text()}`);
+}
+
 /** Baixa o conteúdo de uma foto já enviada, para o backend repassar ao navegador. */
 export async function baixarFoto(driveId: string, itemId: string): Promise<Response> {
   return graphFetch(`/drives/${driveId}/items/${itemId}/content`);

@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ClipboardList, CloudOff, ImageDown, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, CloudOff, ImageDown, Pencil, Plus, RefreshCw, Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
@@ -17,7 +17,9 @@ export function RegistrosDoDia() {
   const navigate = useNavigate();
   const location = useLocation();
   const { usuario } = useAuth();
-  const { draft, resetDraft, resetLocal } = useRegistroDraft();
+  const { draft, resetDraft, resetLocal, iniciarEdicao } = useRegistroDraft();
+  const [abrindoId, setAbrindoId] = useState<number | null>(null);
+  const [abrirErro, setAbrirErro] = useState<string | null>(null);
   const { fila, online, sincronizando, envioAgendado, versao, enviarTudo, sincronizar, descartarDaFila } = useSincronizacao();
   const { data: pendentes, loading, error } = useApiList<Registro>("/registros?status=rascunho", [versao]);
   const { data: placas } = useApiList<Placa>("/placas");
@@ -26,9 +28,12 @@ export function RegistrosDoDia() {
   const [enviarErro, setEnviarErro] = useState<string | null>(null);
   const [enviados, setEnviados] = useState<number | null>(null);
 
-  const estado = location.state as { salvoNoCelular?: boolean; fotosReduzidas?: boolean } | null;
+  const estado = location.state as
+    | { salvoNoCelular?: boolean; fotosReduzidas?: boolean; alteracaoSalva?: boolean }
+    | null;
   const salvoNoCelular = estado?.salvoNoCelular === true;
   const fotosReduzidas = estado?.fotosReduzidas === true;
+  const alteracaoSalva = estado?.alteracaoSalva === true;
   const total = pendentes.length + fila.length;
 
   function novoRegistro() {
@@ -52,6 +57,25 @@ export function RegistrosDoDia() {
       else if ("erro" in resultado) setEnviarErro(resultado.erro);
     } finally {
       setEnviando(false);
+    }
+  }
+
+  // Abrir para corrigir precisa de internet: as fotos já anexadas são trazidas de
+  // volta do servidor para o operador poder vê-las e trocá-las.
+  async function abrirParaCorrigir(registro: Registro) {
+    if (!online) {
+      setAbrirErro("Sem internet: para corrigir um registro já enviado é preciso estar conectado.");
+      return;
+    }
+    setAbrirErro(null);
+    setAbrindoId(registro.id);
+    try {
+      await iniciarEdicao(registro);
+      navigate("/operador/carga");
+    } catch {
+      setAbrirErro("Não foi possível abrir este registro. Tente de novo.");
+    } finally {
+      setAbrindoId(null);
     }
   }
 
@@ -151,7 +175,13 @@ export function RegistrosDoDia() {
             })}
 
             {pendentes.map((r) => (
-              <div key={r.id} className="rounded-xl border border-border bg-surface p-4">
+              <button
+                key={r.id}
+                type="button"
+                disabled={abrindoId !== null}
+                onClick={() => abrirParaCorrigir(r)}
+                className="w-full rounded-xl border border-border bg-surface p-4 text-left transition hover:border-primary disabled:opacity-60"
+              >
                 <div className="flex items-center justify-between">
                   <p className="font-semibold text-white">{r.servico.nome}</p>
                   <span className="text-xs text-gray-500">{dataHoraPtBr(r.createdAt)}</span>
@@ -164,7 +194,11 @@ export function RegistrosDoDia() {
                 <p className="text-sm text-gray-500">
                   {r.motorista.nome} · {r.placa.placa}
                 </p>
-              </div>
+                <p className="mt-3 flex items-center gap-2 text-xs font-semibold text-primary">
+                  <Pencil className="h-4 w-4" />
+                  {abrindoId === r.id ? "Abrindo registro..." : "Toque para corrigir"}
+                </p>
+              </button>
             ))}
           </div>
         )}
@@ -180,6 +214,15 @@ export function RegistrosDoDia() {
             {sincronizando ? "Enviando os guardados no celular..." : "Enviar agora os guardados no celular"}
           </button>
         )}
+
+        {alteracaoSalva && (
+          <div className="flex items-start gap-3 rounded-lg border border-success/40 bg-success/10 px-4 py-3 text-success">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">Alteração salva. O registro segue aguardando o envio ao engenheiro.</p>
+          </div>
+        )}
+
+        {abrirErro && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{abrirErro}</p>}
 
         {enviarErro && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{enviarErro}</p>}
 

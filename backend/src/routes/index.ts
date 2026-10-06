@@ -50,6 +50,19 @@ router.post(
   ]),
   registroController.create
 );
+// Edição de um registro que ainda não foi para a planilha do engenheiro.
+router.put(
+  "/registros/:id",
+  authMiddleware,
+  upload.fields([
+    { name: "fotoTicket", maxCount: 1 },
+    { name: "antes", maxCount: 1 },
+    { name: "durante", maxCount: 1 },
+    { name: "depois", maxCount: 1 },
+    { name: "trena", maxCount: 1 },
+  ]),
+  registroController.atualizar
+);
 
 router.get("/dashboard/resumo", authMiddleware, async (_req, res) => {
   const [motoristas, placas, contratos, servicos, usinas, rodovias, climas, registros] = await Promise.all([

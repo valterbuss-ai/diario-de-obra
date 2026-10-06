@@ -76,7 +76,7 @@ export async function montarRegistroParaEnvio(
   };
 }
 
-export function enviarRegistro(item: RegistroNaFila, timeoutMs: number) {
+function montarFormulario(item: RegistroNaFila) {
   const form = new FormData();
   for (const [campo, valor] of Object.entries(item.campos)) form.append(campo, valor);
   for (const [campo, arquivo] of Object.entries(item.arquivos)) {
@@ -84,6 +84,23 @@ export function enviarRegistro(item: RegistroNaFila, timeoutMs: number) {
     // O servidor tira a extensão do nome do arquivo, então ela vem do tipo da imagem.
     form.append(campo, arquivo, nomeDaFoto(campo, arquivo));
   }
+  return form;
+}
+
+/**
+ * Salva as alterações de um registro que ainda não foi para a planilha. Só as fotos
+ * que o operador trocou são enviadas; as demais ficam como estão no SharePoint,
+ * preservando o número que já receberam na sequência do engenheiro.
+ */
+export function atualizarRegistro(id: number, item: RegistroNaFila, timeoutMs: number) {
+  return api.put<Registro>(`/registros/${id}`, montarFormulario(item), {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: timeoutMs,
+  });
+}
+
+export function enviarRegistro(item: RegistroNaFila, timeoutMs: number) {
+  const form = montarFormulario(item);
   return api.post<Registro>("/registros", form, {
     headers: { "Content-Type": "multipart/form-data" },
     timeout: timeoutMs,

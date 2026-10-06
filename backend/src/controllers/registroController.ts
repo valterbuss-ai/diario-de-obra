@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { prisma } from "../lib/prisma";
-import { enviarFoto, renomearItem } from "../lib/msGraph";
+import { enviarFoto, renomearItem, substituirConteudoDaFoto } from "../lib/msGraph";
 import { enviarRegistroParaPlanilha } from "../lib/n8nWebhook";
 
 /**
@@ -383,6 +383,211 @@ export const registroController = {
     if (status === "enviado") {
       enviarRegistroParaPlanilha(registro).catch(() => {});
     }
+  },
+
+  /**
+   * Edita um registro que ainda não foi para a planilha do engenheiro.
+   *
+   * A regra que manda aqui é a numeração das fotos: cada foto já arquivada tem um
+   * número da sequência mensal do engenheiro. Por isso, substituir uma foto troca o
+   * conteúdo do mesmo arquivo no SharePoint, preservando o número. Só uma foto que
+   * ainda não existia consome um número novo.
+   */
+  atualizar: async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Registro inválido." });
+
+    const parsed = createSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Dados inválidos.", issues: parsed.error.issues });
+    }
+    const data = parsed.data;
+
+    const registro = await prisma.registro.findUnique({ where: { id }, include: { fotos: true } });
+    if (!registro) return res.status(404).json({ message: "Registro não encontrado." });
+    // Depois de ir para a planilha, alterar aqui deixaria os dois lados diferentes.
+    if (registro.status !== "rascunho") {
+      return res.status(409).json({
+        message: "Este registro já foi enviado ao engenheiro e não pode mais ser alterado.",
+      });
+    }
+
+    const files = (req.files ?? {}) as UploadedFiles;
+    const fotoTicket = files.fotoTicket?.[0];
+
+    const [motorista, placa, contrato, servico, clima, usina, rodovia] = await Promise.all([
+      prisma.motorista.findFirst({ where: { nome: { equals: data.motoristaNome, mode: "insensitive" }, excluidoEm: null } }),
+      prisma.placa.findUnique({ where: { id: data.placaId } }),
+      prisma.contrato.findUnique({ where: { id: data.contratoId } }),
+      prisma.servico.findUnique({ where: { id: data.servicoId } }),
+      prisma.clima.findUnique({ where: { id: data.climaId } }),
+      prisma.usina.findUnique({ where: { id: data.usinaId } }),
+      data.rodoviaId === undefined ? null : prisma.rodovia.findUnique({ where: { id: data.rodoviaId } }),
+    ]);
+
+    if (!placa) return res.status(400).json({ message: "Placa inválida." });
+    if (!contrato) return res.status(400).json({ message: "Contrato inválido." });
+    if (!servico) return res.status(400).json({ message: "Serviço inválido." });
+    if (!clima) return res.status(400).json({ message: "Clima inválido." });
+    if (!usina) return res.status(400).json({ message: "Usina inválida." });
+
+    const ehTerceirizado = req.user?.perfil === "terceirizado";
+    if (placa.tipo !== (ehTerceirizado ? "terceirizada" : "propria")) {
+      return res.status(400).json({ message: "Esta placa não está disponível para o seu perfil." });
+    }
+    if (servico.tipo !== (ehTerceirizado ? "terceirizado" : "interno")) {
+      return res.status(400).json({ message: "Este serviço não está disponível para o seu perfil." });
+    }
+
+    const ehLogradouro = contrato.tipoLocal === "logradouro";
+    if (ehLogradouro) {
+      if (!data.logradouro) return res.status(400).json({ message: "Este contrato é de logradouro: informe a rua." });
+      if (!contrato.municipio) {
+        return res.status(400).json({
+          message: "Este contrato está marcado como de logradouro mas não tem município cadastrado. Avise o administrador.",
+        });
+      }
+    } else {
+      if (!rodovia) return res.status(400).json({ message: "Rodovia inválida." });
+      if (data.km === undefined) return res.status(400).json({ message: "Informe o km." });
+      if (!data.cidade) return res.status(400).json({ message: "Cidade inválida." });
+    }
+
+    // A pasta no SharePoint foi criada com a data original do registro; mexer nela
+    // moveria as fotos de dia e furaria a organização do engenheiro.
+    const dataRegistro = registro.data;
+    const porTipo = new Map(registro.fotos.map((f) => [f.tipo, f]));
+    const recebidas = (
+      [
+        files.antes?.[0] && { tipo: "antes" as const, file: files.antes[0] },
+        files.durante?.[0] && { tipo: "durante" as const, file: files.durante[0] },
+        files.depois?.[0] && { tipo: "depois" as const, file: files.depois[0] },
+        files.trena?.[0] && { tipo: "trena" as const, file: files.trena[0] },
+      ].filter(Boolean) as { tipo: "antes" | "durante" | "depois" | "trena"; file: Express.Multer.File }[]
+    );
+
+    const jaExistiam = recebidas.filter(({ tipo }) => porTipo.get(tipo)?.itemId);
+    const saoNovas = recebidas.filter(({ tipo }) => !porTipo.get(tipo)?.itemId);
+    const fotosParaCriar: { tipo: "antes" | "durante" | "depois" | "trena" | "ticket"; driveId: string; itemId: string }[] = [];
+
+    try {
+      // Troca o conteúdo no mesmo arquivo: o número da sequência é preservado.
+      await Promise.all(
+        jaExistiam.map(async ({ tipo, file }) => {
+          const atual = porTipo.get(tipo)!;
+          await substituirConteudoDaFoto(atual.driveId!, atual.itemId!, file.buffer, file.mimetype);
+        })
+      );
+
+      // Foto que ainda não existia neste registro: aí sim consome número novo.
+      if (saoNovas.length > 0) {
+        const pasta = pastaDoRegistro(contrato.codigo, dataRegistro);
+        const prefixoTemporario = `tmp-edicao-${registro.id}-${Date.now()}`;
+        const enviadas = await Promise.all(
+          saoNovas.map(async ({ tipo, file }) => {
+            const extensao = extensaoDaFoto(file);
+            const { driveId, itemId } = await enviarFoto(
+              `${pasta}/${prefixoTemporario}-${tipo}${extensao}`,
+              file.buffer,
+              file.mimetype
+            );
+            return { tipo, driveId, itemId, extensao };
+          })
+        );
+        const primeiroNumero = await reservarNumerosDoMes(
+          dataRegistro.getFullYear(),
+          dataRegistro.getMonth() + 1,
+          enviadas.length
+        );
+        for (const [indice, foto] of enviadas.entries()) {
+          const numero = String(primeiroNumero + indice).padStart(3, "0");
+          await renomearItem(foto.driveId, foto.itemId, `${numero}-${foto.tipo}${foto.extensao}`).catch((erro) =>
+            console.error(`[registros] Não consegui renomear a foto ${foto.tipo} para ${numero}:`, erro)
+          );
+          fotosParaCriar.push({ tipo: foto.tipo, driveId: foto.driveId, itemId: foto.itemId });
+        }
+      }
+
+      if (fotoTicket) {
+        const atual = porTipo.get("ticket");
+        if (atual?.driveId && atual?.itemId) {
+          await substituirConteudoDaFoto(atual.driveId, atual.itemId, fotoTicket.buffer, fotoTicket.mimetype);
+          // O arquivo do ticket é nomeado pelo número dele; se o número mudou, o
+          // nome acompanha. Se a renomeação falhar, a foto continua acessível.
+          if (registro.numeroTicket !== data.numeroTicket) {
+            await renomearItem(
+              atual.driveId,
+              atual.itemId,
+              `${nomeSeguro(data.numeroTicket)}${extensaoDaFoto(fotoTicket)}`
+            ).catch((erro) => console.error("[registros] Não consegui renomear a foto do ticket:", erro));
+          }
+        } else {
+          const pastaTicket = `Tickets/${pastaDoRegistro(contrato.codigo, dataRegistro)}`;
+          const { driveId, itemId } = await enviarFoto(
+            `${pastaTicket}/${nomeSeguro(data.numeroTicket)}${extensaoDaFoto(fotoTicket)}`,
+            fotoTicket.buffer,
+            fotoTicket.mimetype,
+            { naoSobrescrever: true }
+          );
+          fotosParaCriar.push({ tipo: "ticket", driveId, itemId });
+        }
+      }
+    } catch (err) {
+      console.error("[registros] Erro ao atualizar as fotos no SharePoint:", err);
+      const motivo = err instanceof Error ? err.message : String(err);
+      return res.status(502).json({
+        message: `Não foi possível atualizar as fotos no SharePoint. A alteração não foi salva — tente de novo. (${motivo.slice(0, 300)})`,
+      });
+    }
+
+    const atualizado = await prisma.$transaction(
+      async (tx) => {
+        const motoristaId = motorista
+          ? motorista.id
+          : (
+              await tx.motorista.create({
+                data: { nome: data.motoristaNome, cpf: `PENDENTE-${Date.now()}`, cnh: "PENDENTE", status: "ativo" },
+              })
+            ).id;
+
+        return tx.registro.update({
+          where: { id },
+          data: {
+            motoristaId,
+            placaId: data.placaId,
+            contratoId: data.contratoId,
+            servicoId: data.servicoId,
+            climaId: data.climaId,
+            usinaId: data.usinaId,
+            numeroTicket: data.numeroTicket,
+            toneladas: data.toneladas,
+            rodoviaId: ehLogradouro ? null : data.rodoviaId!,
+            km: ehLogradouro ? data.km ?? null : data.km!,
+            logradouro: ehLogradouro ? data.logradouro! : null,
+            cidade: ehLogradouro ? contrato.municipio! : data.cidade!,
+            comprimento: data.comprimento,
+            largura: data.largura,
+            espessura: data.espessura,
+            lado: data.lado,
+            observacoes: data.observacoes ?? null,
+            fotos: fotosParaCriar.length > 0 ? { create: fotosParaCriar } : undefined,
+          },
+          include: {
+            fotos: true,
+            contrato: true,
+            placa: true,
+            servico: true,
+            clima: true,
+            usina: true,
+            rodovia: true,
+            usuario: { select: { id: true, nome: true, perfil: true } },
+          },
+        });
+      },
+      { timeout: 30_000, maxWait: 15_000 }
+    );
+
+    res.json(atualizado);
   },
 
   enviarLote: async (_req: Request, res: Response) => {

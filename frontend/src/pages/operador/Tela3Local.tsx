@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Pencil } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
@@ -17,7 +17,8 @@ const FOTOS: { tipo: "antes" | "durante" | "depois" | "trena"; label: string }[]
 ];
 
 export function Tela3Local() {
-  const { draft, updateDraft, updateFoto, submitDraft, resetLocal, submitting, submitError } = useRegistroDraft();
+  const { draft, updateDraft, updateFoto, submitDraft, resetLocal, submitting, submitError, editandoId } =
+    useRegistroDraft();
   const navigate = useNavigate();
   const { usuario } = useAuth();
   // Lista completa de trechos (fica guardada no celular): a cidade é achada
@@ -156,10 +157,11 @@ export function Tela3Local() {
 
   async function handleSalvar() {
     try {
+      const corrigindo = editandoId !== null;
       const { offline, fotosReduzidas } = await submitDraft("rascunho");
       // Equipe e carga ficam para o próximo registro; só a etapa 3 é limpa.
       resetLocal();
-      navigate("/operador/dia", { state: { salvoNoCelular: offline, fotosReduzidas } });
+      navigate("/operador/dia", { state: { salvoNoCelular: offline, fotosReduzidas, alteracaoSalva: corrigindo } });
     } catch {
       // erro exposto via contexto (submitError)
     }
@@ -168,6 +170,15 @@ export function Tela3Local() {
   return (
     <OperadorLayout step={3} title="Localização e fotos" subtitle="Registre onde o serviço foi realizado e documente com fotos.">
       <div className="flex flex-col gap-8">
+        {editandoId !== null && (
+          <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-primary">
+            <Pencil className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">
+              Corrigindo um registro já salvo. As fotos já anexadas aparecem abaixo e podem ser trocadas.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface-alt px-4 py-3">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-wide text-gray-500">Equipe e carga</p>
@@ -372,7 +383,7 @@ export function Tela3Local() {
             onClick={handleSalvar}
             className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-success px-4 py-4 font-semibold text-black hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {submitting ? "Salvando..." : "Salvar registro"}
+            {submitting ? "Salvando..." : editandoId !== null ? "Salvar alteração" : "Salvar registro"}
           </button>
         </div>
       </div>

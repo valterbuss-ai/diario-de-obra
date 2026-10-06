@@ -1,4 +1,4 @@
-﻿import { ArrowLeft, ArrowRight } from "lucide-react";
+﻿import { ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { OperadorLayout } from "../../components/OperadorLayout";
 import { PhotoSlot } from "../../components/PhotoSlot";
@@ -8,7 +8,7 @@ import { useApiList } from "../../services/hooks";
 import type { Usina } from "../../types";
 
 export function Tela2Carga() {
-  const { draft, updateDraft } = useRegistroDraft();
+  const { draft, updateDraft, editandoId } = useRegistroDraft();
   const navigate = useNavigate();
   const { data: usinas } = useApiList<Usina>("/usinas");
   const usinasAtivas = usinas.filter((u) => u.status === "ativa");
@@ -18,6 +18,15 @@ export function Tela2Carga() {
   return (
     <OperadorLayout step={2} title="Dados da carga" subtitle="Informe a usina de origem e o ticket de pesagem.">
       <div className="flex flex-col gap-5">
+        {editandoId !== null && (
+          <div className="flex items-start gap-3 rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-primary">
+            <Pencil className="mt-0.5 h-5 w-5 shrink-0" />
+            <p className="text-sm font-medium">
+              Corrigindo um registro já salvo. Ajuste o que for preciso e siga até o fim para salvar.
+            </p>
+          </div>
+        )}
+
         <SelectField
           label="Usina"
           required

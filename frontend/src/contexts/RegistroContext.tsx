@@ -1,9 +1,10 @@
 ﻿import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { comFotosReduzidas, enviarRegistro, montarRegistroParaEnvio } from "../offline/registroOffline";
+import { atualizarRegistro, comFotosReduzidas, enviarRegistro, montarRegistroParaEnvio } from "../offline/registroOffline";
+import { fotoUrl } from "../services/api";
 import { useAuth } from "./AuthContext";
 import { useSincronizacao } from "./SincronizacaoContext";
-import type { LadoPista } from "../types";
+import type { LadoPista, Registro } from "../types";
 
 export interface RegistroDraft {
   motoristaNome: string;
@@ -85,6 +86,59 @@ interface RegistroContextValue {
   submitError: string | null;
   /** Salva no servidor; sem internet, guarda no celular (offline: true). */
   submitDraft: (status?: "rascunho" | "enviado") => Promise<{ offline: boolean; fotosReduzidas: boolean }>;
+  /** Id do registro sendo corrigido, ou null quando é um registro novo. */
+  editandoId: number | null;
+  /** Abre um registro pendente para correção, trazendo as fotos já anexadas. */
+  iniciarEdicao: (registro: Registro) => Promise<void>;
+  cancelarEdicao: () => void;
+}
+
+/**
+ * Reconstrói o rascunho a partir de um registro já salvo, para o operador corrigi-lo.
+ * No contrato de logradouro, rua e número foram guardados em campos diferentes
+ * (o número vai no km, ou junto da rua quando não é numérico) — aqui eles voltam
+ * a ser dois campos na tela.
+ */
+function draftDoRegistro(registro: Registro, arquivos: RegistroDraft["fotos"], fotoTicket: File | null): RegistroDraft {
+  const ehLogradouro = registro.logradouro !== null;
+  let rua = registro.logradouro ?? "";
+  let numero = "";
+  if (ehLogradouro) {
+    if (registro.km) {
+      numero = String(Number(registro.km));
+    } else {
+      // Número não numérico foi guardado junto da rua ("Rua X, s/n").
+      const virgula = rua.lastIndexOf(", ");
+      if (virgula > 0) {
+        numero = rua.slice(virgula + 2);
+        rua = rua.slice(0, virgula);
+      }
+    }
+  }
+
+  return {
+    motoristaNome: registro.motorista.nome,
+    placaId: registro.placa.id,
+    contratoId: registro.contrato.id,
+    servicoId: registro.servico.id,
+    climaId: registro.clima.id,
+    usinaId: registro.usina.id,
+    numeroTicket: registro.numeroTicket,
+    toneladas: String(registro.toneladas),
+    fotoTicket,
+    rodoviaNome: registro.rodovia?.rodovia ?? "",
+    km: ehLogradouro ? "" : registro.km ?? "",
+    logradouro: rua,
+    numeroLogradouro: numero,
+    cidade: registro.cidade,
+    rodoviaId: registro.rodovia?.id ?? "",
+    comprimento: String(registro.comprimento),
+    largura: String(registro.largura),
+    espessura: String(registro.espessura),
+    lado: registro.lado,
+    observacoes: registro.observacoes ?? "",
+    fotos: arquivos,
+  };
 }
 
 const RegistroContext = createContext<RegistroContextValue | undefined>(undefined);
@@ -93,6 +147,7 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   const [draft, setDraft] = useState<RegistroDraft>(emptyDraft);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
   const { usuario } = useAuth();
   const { adicionarNaFila } = useSincronizacao();
 
@@ -100,7 +155,41 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   // mesmo celular não pode herdar o rascunho do operador anterior.
   useEffect(() => {
     setDraft(emptyDraft);
+    setEditandoId(null);
   }, [usuario?.id]);
+
+  /** Traz uma foto já arquivada de volta para o formulário, para poder ser trocada. */
+  async function baixarFoto(fotoId: number, nome: string): Promise<File | null> {
+    const url = fotoUrl(fotoId);
+    if (!url) return null; // sem token guardado: a foto volta vazia e pode ser tirada de novo
+    try {
+      const resposta = await fetch(url);
+      if (!resposta.ok) return null;
+      const blob = await resposta.blob();
+      return new File([blob], nome, { type: blob.type || "image/jpeg" });
+    } catch {
+      return null;
+    }
+  }
+
+  async function iniciarEdicao(registro: Registro) {
+    const porTipo = Object.fromEntries(registro.fotos.map((f) => [f.tipo, f.id]));
+    const [antes, durante, depois, trena, ticket] = await Promise.all([
+      porTipo.antes ? baixarFoto(porTipo.antes, "antes.jpg") : null,
+      porTipo.durante ? baixarFoto(porTipo.durante, "durante.jpg") : null,
+      porTipo.depois ? baixarFoto(porTipo.depois, "depois.jpg") : null,
+      porTipo.trena ? baixarFoto(porTipo.trena, "trena.jpg") : null,
+      porTipo.ticket ? baixarFoto(porTipo.ticket, "ticket.jpg") : null,
+    ]);
+    setDraft(draftDoRegistro(registro, { antes, durante, depois, trena }, ticket));
+    setSubmitError(null);
+    setEditandoId(registro.id);
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setDraft(emptyDraft);
+  }
 
   function updateDraft(patch: Partial<RegistroDraft>) {
     setDraft((prev) => ({ ...prev, ...patch }));
@@ -110,11 +199,15 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
     setDraft((prev) => ({ ...prev, fotos: { ...prev.fotos, [tipo]: file } }));
   }
 
+  // Começar um registro novo sempre sai do modo de correção: senão o próximo
+  // "Salvar" sobrescreveria o registro que estava sendo editado.
   function resetDraft() {
+    setEditandoId(null);
     setDraft(emptyDraft);
   }
 
   function resetLocal() {
+    setEditandoId(null);
     setDraft((prev) => ({
       ...prev,
       rodoviaNome: emptyDraft.rodoviaNome,
@@ -145,6 +238,22 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
     };
     try {
       const item = await montarRegistroParaEnvio(draft, status, usuario?.id ?? 0);
+
+      // Correção de um registro que já está no servidor. Não vai para a fila do
+      // celular: a fila é para registros novos, e reenviá-la criaria um duplicado.
+      if (editandoId !== null) {
+        try {
+          await atualizarRegistro(editandoId, item, 300_000);
+          setEditandoId(null);
+          return { offline: false, fotosReduzidas: false };
+        } catch (err: any) {
+          throw avisar(
+            err.response?.data?.message ??
+              "Não foi possível salvar a alteração. Verifique a internet e tente de novo."
+          );
+        }
+      }
+
       if (navigator.onLine) {
         try {
           // Com sinal fraco não deixa o operador esperando: se passar do tempo,
@@ -190,7 +299,21 @@ export function RegistroProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <RegistroContext.Provider value={{ draft, updateDraft, updateFoto, resetDraft, resetLocal, submitting, submitError, submitDraft }}>
+    <RegistroContext.Provider
+      value={{
+        draft,
+        updateDraft,
+        updateFoto,
+        resetDraft,
+        resetLocal,
+        submitting,
+        submitError,
+        submitDraft,
+        editandoId,
+        iniciarEdicao,
+        cancelarEdicao,
+      }}
+    >
       {children}
     </RegistroContext.Provider>
   );
